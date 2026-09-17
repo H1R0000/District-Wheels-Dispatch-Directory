@@ -1,16 +1,18 @@
 # District Wheels Dispatch Directory
 
-District Wheels Dispatch Directory is a planned fulfillment tool for finding repeat buyers and copying their saved shipping information into LBC or J&T Express forms. The current Week 1 increment is an interactive, responsive wireframe board that documents the app's four screens, component architecture, and primary task flow before the React, Express, and PostgreSQL implementation begins.
-
 ## Submission link
 
 Submit the public GitHub URL for this `README.md` after the project repository is created. The rendered README page on GitHub is the intended documentation submission.
 
-## Current status
+## 1. Overview
 
-Week 1 planning prototype. The responsive wireframes and design system are complete. The production application, REST API, and PostgreSQL database are not implemented yet.
+District Wheels Dispatch Directory is a planned fulfillment tool for the District Wheels fulfillment manager. It will help the manager find a repeat buyer and copy saved shipping information into LBC or J&T Express forms with fewer repeated lookups and typing errors.
 
-## Requirements
+The current Week 1 increment is an interactive, responsive wireframe board. It documents the four main screens, component architecture, primary task flow, responsive behavior, and design system before the React, Express, and PostgreSQL implementation begins.
+
+## 2. Setup and installation
+
+### Prerequisites
 
 To run the current prototype locally, install:
 
@@ -20,7 +22,7 @@ To run the current prototype locally, install:
 
 The prototype uses plain HTML, CSS, and JavaScript. It has no package dependencies and does not require `npm install`.
 
-## Setup and installation
+### Get the code
 
 1. Clone the project's public GitHub repository after it has been connected:
 
@@ -34,15 +36,17 @@ The prototype uses plain HTML, CSS, and JavaScript. It has no package dependenci
    cd DCW_Dispatch_Directory
    ```
 
-3. Confirm that the static site files are present:
+### Install dependencies
 
-   ```text
-   dist/index.html
-   dist/styles.css
-   dist/wireframe.js
-   ```
+No dependency installation is required for the Week 1 prototype. There is no `package.json` and no `node_modules` folder.
 
-4. No dependency installation or database setup is required for this Week 1 prototype.
+Confirm that the static site files are present:
+
+```text
+dist/index.html
+dist/styles.css
+dist/wireframe.js
+```
 
 ### Environment and configuration
 
@@ -50,11 +54,11 @@ The current prototype requires no environment variables, secrets, or external se
 
 Do not add real buyer records or courier credentials to the repository. The finished application will use placeholder values in an `.env.example` file and keep real secrets in an untracked `.env` file.
 
-### Database setup
+### Set up and seed the database
 
-There is no database in the Week 1 increment. The planned PostgreSQL database will be added in a later increment and seeded only with fictional buyer and shipping data.
+There is no database to create, migrate, or seed in the Week 1 increment. The planned PostgreSQL database will be added later and seeded only with fictional buyer and shipping data. This section will be updated with exact migration and seed commands when the database exists.
 
-## How to run it
+## 3. How to run it
 
 From the project root, start a local server:
 
@@ -74,7 +78,7 @@ When it works, the first screen is the **District Wheels Dispatch Directory** pl
 
 Stop the server with `Ctrl+C` in the terminal.
 
-## Features and usage
+## 4. Features and usage
 
 ### Screen map
 
@@ -122,7 +126,7 @@ Open **04 Task walkthrough** to follow the primary fulfillment flow:
 
 The Week 1 prototype has no API endpoints. Planned Express routes will cover buyers, addresses, LBC pickup locations, and couriers after the database is implemented.
 
-## Project structure
+## 5. Project structure
 
 ```text
 DCW_Dispatch_Directory/
@@ -130,7 +134,7 @@ DCW_Dispatch_Directory/
 |   |-- index.html          # Interactive wireframe board
 |   |-- styles.css          # Responsive wireframe styles
 |   |-- wireframe.js        # Screen and viewport switching
-|   |-- report.html         # Hosted Week 1 increment report
+|   |-- report.html         # Browser version of the Week 1 report
 |   `-- report.css          # Increment report styling
 |-- docs/
 |   `-- images/             # README screenshots
@@ -142,7 +146,7 @@ DCW_Dispatch_Directory/
 `-- README.md               # Project documentation
 ```
 
-## Screenshots
+## 6. Screenshots
 
 ### Desktop wireframe comparison
 
@@ -152,7 +156,7 @@ DCW_Dispatch_Directory/
 
 ![Phone-width view of the District Wheels screen map](docs/images/wireframe-mobile.png)
 
-## Known issues and next steps
+## 7. Known issues and next steps
 
 ### Known issues
 
