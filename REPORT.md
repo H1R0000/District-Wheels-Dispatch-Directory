@@ -37,8 +37,6 @@ The design system turns repeated visual decisions into reusable rules. Defining 
 - The first PDF exports had inconsistent button-label padding, crowded metadata, and checklist content that extended beyond its card. I corrected the shared button alignment and adjusted the affected card spacing, then rechecked all pages.
 - The hardest planned data rule is still unresolved in code: each buyer may have several addresses and LBC pickup locations, but only one default of each type. The intended solution is an Express API transaction plus PostgreSQL partial unique indexes, but it has not been implemented or tested yet.
 - The current hosted work is a planning prototype. Its fields and records are placeholders, and the controls demonstrate layout changes rather than saving real data.
-- The expected course folder `content/finals/` was not present in this checkout. I used the supplied finals overview, report template, and rubric as the available assignment references.
-
 ## What is left
 
 - Create the final React application and connect its four routes.
@@ -50,4 +48,3 @@ The design system turns repeated visual decisions into reusable rules. Defining 
 - Replace placeholder wireframe content with working components and real API responses.
 - Complete the setup, usage, endpoint, structure, screenshot, and known-issues sections in the project README.
 - Perform keyboard, responsive, and accessibility testing before the final submission.
-
