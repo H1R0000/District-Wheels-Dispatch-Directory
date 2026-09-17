@@ -8,19 +8,13 @@
 
 District Wheels Dispatch Directory is a planned fulfillment tool for the District Wheels fulfillment manager. It will help the manager find a repeat buyer and copy saved shipping information into LBC or J&T Express forms with fewer repeated lookups and typing errors.
 
-The current Week 1 increment is an interactive, responsive wireframe board. It documents the four main screens, component architecture, primary task flow, responsive behavior, and design system before the React, Express, and PostgreSQL implementation begins.
+The current Week 1 increment is written project documentation. It covers the four planned screens, component architecture, primary task flow, responsive behavior, and design system before the React, Express, and PostgreSQL implementation begins.
 
 ## 2. Setup and installation
 
 ### Prerequisites
 
-To run the current prototype locally, install:
-
-- [Git](https://git-scm.com/) for obtaining the project.
-- Python 3.10 or newer for the local static server.
-- A current browser such as Chrome, Edge, or Firefox.
-
-The prototype uses plain HTML, CSS, and JavaScript. It has no package dependencies and does not require `npm install`.
+No application setup or dependency installation is required. The repository currently contains documentation only. Git is optional and is needed only if you want a local copy.
 
 ### Get the code
 
@@ -38,15 +32,7 @@ The prototype uses plain HTML, CSS, and JavaScript. It has no package dependenci
 
 ### Install dependencies
 
-No dependency installation is required for the Week 1 prototype. There is no `package.json` and no `node_modules` folder.
-
-Confirm that the static site files are present:
-
-```text
-dist/index.html
-dist/styles.css
-dist/wireframe.js
-```
+There are no dependencies to install. Markdown files can be read directly on GitHub, while the exported PDFs and images can be opened with their usual viewers.
 
 ### Environment and configuration
 
@@ -58,25 +44,9 @@ Do not add real buyer records or courier credentials to the repository. The fini
 
 There is no database to create, migrate, or seed in the Week 1 increment. The planned PostgreSQL database will be added later and seeded only with fictional buyer and shipping data. This section will be updated with exact migration and seed commands when the database exists.
 
-## 3. How to run it
+## 3. How to view it
 
-From the project root, start a local server:
-
-```bash
-python -m http.server 4173 --directory dist
-```
-
-On Windows, if `python` is not recognized, use:
-
-```powershell
-py -m http.server 4173 --directory dist
-```
-
-Open [http://127.0.0.1:4173](http://127.0.0.1:4173) in a browser.
-
-When it works, the first screen is the **District Wheels Dispatch Directory** planning board. Its navigation contains Screen map, Screen wireframes, Component tree, Task walkthrough, and Week 1 report.
-
-Stop the server with `Ctrl+C` in the terminal.
+Open this README on GitHub, then use the links under **Supporting files** to read the proposal, wireframe documentation, increment report, and exported PDFs. No local server is required.
 
 ## 4. Features and usage
 
@@ -93,16 +63,11 @@ It also shows where the user returns after saving or canceling a buyer form.
 
 ### Responsive screen wireframes
 
-1. Open **02 Screen wireframes**.
-2. Select Buyer Directory, Buyer Details, Add Buyer, or Edit Buyer.
-3. Select **Both**, **Desktop**, or **Phone** to change the viewport comparison.
-4. Review the labels inside each wireframe to understand the planned content and actions.
-
-The current controls switch between planning views. Search, save, edit, delete, and copy actions are visual placeholders and do not change stored data.
+Open the wireframe documentation or PDF to review the Buyer Directory, Buyer Details, Add Buyer, and Edit Buyer layouts at desktop and phone sizes. Search, save, edit, delete, and copy actions shown in the wireframes are planned features rather than working controls.
 
 ### Component architecture
 
-Open **03 Component tree** to review:
+Open the wireframe documentation to review:
 
 - Page-level components for the four screens.
 - Organisms such as `AppHeader` and `LocationDialog`.
@@ -113,7 +78,7 @@ The atomic-design table records where each component appears and the props it is
 
 ### Task walkthrough
 
-Open **04 Task walkthrough** to follow the primary fulfillment flow:
+Use the task-flow section of the wireframe documentation to follow the primary fulfillment flow:
 
 1. Search for a repeat buyer.
 2. Open the buyer record.
@@ -130,12 +95,6 @@ The Week 1 prototype has no API endpoints. Planned Express routes will cover buy
 
 ```text
 DCW_Dispatch_Directory/
-|-- dist/
-|   |-- index.html          # Interactive wireframe board
-|   |-- styles.css          # Responsive wireframe styles
-|   |-- wireframe.js        # Screen and viewport switching
-|   |-- report.html         # Browser version of the Week 1 report
-|   `-- report.css          # Increment report styling
 |-- docs/
 |   |-- images/             # README screenshots
 |   |-- pdf/                # Exported wireframe and design-system PDFs
@@ -159,7 +118,7 @@ DCW_Dispatch_Directory/
 
 ### Known issues
 
-- The project is currently a planning prototype, not the finished dispatch application.
+- The project currently contains planning documentation, not the finished dispatch application.
 - Buyer records, addresses, pickup locations, and courier choices are placeholders.
 - Search, copy, create, edit, delete, and save controls do not yet perform data operations.
 - The database rule that allows only one default address and one default LBC pickup location per buyer is designed but not implemented or tested.
