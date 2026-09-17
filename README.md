@@ -137,12 +137,11 @@ DCW_Dispatch_Directory/
 |   |-- report.html         # Browser version of the Week 1 report
 |   `-- report.css          # Increment report styling
 |-- docs/
-|   `-- images/             # README screenshots
-|-- output/
-|   `-- pdf/                # Exported wireframe and design-system PDFs
-|-- 01-proposal-answered.md # Project proposal
-|-- District-Wheels-Wireframes.md
-|-- REPORT.md               # Week 1 increment report
+|   |-- images/             # README screenshots
+|   |-- pdf/                # Exported wireframe and design-system PDFs
+|   |-- proposal.md         # Project proposal
+|   |-- wireframes.md       # Detailed wireframe documentation
+|   `-- week-1-increment-report.md
 `-- README.md               # Project documentation
 ```
 
@@ -179,8 +178,8 @@ DCW_Dispatch_Directory/
 
 ## Supporting files
 
-- [Project proposal](01-proposal-answered.md)
-- [Week 1 increment report](REPORT.md)
-- [Wireframe documentation](District-Wheels-Wireframes.md)
-- [Wireframe PDF](output/pdf/District-Wheels-Wireframes.pdf)
-- [Design-system PDF](output/pdf/District-Wheels-Design-System.pdf)
+- [Project proposal](docs/proposal.md)
+- [Week 1 increment report](docs/week-1-increment-report.md)
+- [Wireframe documentation](docs/wireframes.md)
+- [Wireframe PDF](docs/pdf/District-Wheels-Wireframes.pdf)
+- [Design-system PDF](docs/pdf/District-Wheels-Design-System.pdf)
