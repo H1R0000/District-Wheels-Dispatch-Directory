@@ -1,9 +1,5 @@
 # District Wheels Dispatch Directory
 
-## Submission link
-
-[Open the published documentation on GitHub](https://github.com/H1R0000/District-Wheels-Dispatch-Directory/blob/main/README.md)
-
 ## 1. Overview
 
 District Wheels Dispatch Directory is a planned fulfillment tool for the District Wheels fulfillment manager. It will help the manager find a repeat buyer and copy saved shipping information into LBC or J&T Express forms with fewer repeated lookups and typing errors.
