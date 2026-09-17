@@ -2,7 +2,7 @@
 
 ## Submission link
 
-Submit the public GitHub URL for this `README.md` after the project repository is created. The rendered README page on GitHub is the intended documentation submission.
+[Open the published documentation on GitHub](https://github.com/H1R0000/District-Wheels-Dispatch-Directory/blob/main/README.md)
 
 ## 1. Overview
 
@@ -24,10 +24,10 @@ The prototype uses plain HTML, CSS, and JavaScript. It has no package dependenci
 
 ### Get the code
 
-1. Clone the project's public GitHub repository after it has been connected:
+1. Clone the public GitHub repository:
 
    ```bash
-   git clone <public-github-repository-url>
+   git clone https://github.com/H1R0000/District-Wheels-Dispatch-Directory.git
    ```
 
 2. Enter the project directory:
@@ -163,7 +163,6 @@ DCW_Dispatch_Directory/
 - The project is currently a planning prototype, not the finished dispatch application.
 - Buyer records, addresses, pickup locations, and courier choices are placeholders.
 - Search, copy, create, edit, delete, and save controls do not yet perform data operations.
-- The public GitHub repository URL still needs to replace the clone placeholder in this README.
 - The database rule that allows only one default address and one default LBC pickup location per buyer is designed but not implemented or tested.
 
 ### Next steps
@@ -176,7 +175,7 @@ DCW_Dispatch_Directory/
 - Add clipboard actions and text-based success or failure feedback.
 - Add validation, database transactions, and useful loading, empty, and error states.
 - Test responsive layouts, keyboard operation, and accessibility.
-- Replace the repository placeholder and document the final environment variables, database commands, and API endpoints.
+- Document the final environment variables, database commands, and API endpoints when those features are implemented.
 
 ## Supporting files
 
