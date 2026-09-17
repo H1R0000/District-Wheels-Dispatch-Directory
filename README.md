@@ -2,11 +2,9 @@
 
 District Wheels Dispatch Directory is a planned fulfillment tool for finding repeat buyers and copying their saved shipping information into LBC or J&T Express forms. The current Week 1 increment is an interactive, responsive wireframe board that documents the app's four screens, component architecture, and primary task flow before the React, Express, and PostgreSQL implementation begins.
 
-## Live site
+## Submission link
 
-[Open the District Wheels wireframe board](https://midterm-reflection-6apsi-sakse.parkhero786.chatgpt.site/)
-
-The live site currently contains the wireframe board and the [Week 1 increment report](https://midterm-reflection-6apsi-sakse.parkhero786.chatgpt.site/report.html).
+Submit the public GitHub URL for this `README.md` after the project repository is created. The rendered README page on GitHub is the intended documentation submission.
 
 ## Current status
 
@@ -183,4 +181,3 @@ DCW_Dispatch_Directory/
 - [Wireframe documentation](District-Wheels-Wireframes.md)
 - [Wireframe PDF](output/pdf/District-Wheels-Wireframes.pdf)
 - [Design-system PDF](output/pdf/District-Wheels-Design-System.pdf)
-
