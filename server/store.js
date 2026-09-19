@@ -31,6 +31,7 @@ export class MemoryStore {
     const compact = needle.replace(/\s/g, '');
     return clone(this.buyers
       .filter((buyer) => !needle || buyer.name.toLocaleLowerCase('en-PH').includes(needle) || buyer.phone.replace(/\s/g, '').includes(compact))
+      .sort((left, right) => left.name.localeCompare(right.name, 'en-PH', { sensitivity: 'base', numeric: true }))
       .map(({ addresses, pickups, ...summary }) => ({ ...summary, addressCount: addresses.length, pickupCount: pickups.length })));
   }
 

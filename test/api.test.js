@@ -29,6 +29,11 @@ test('buyer search matches names and phone numbers', async () => {
   assert.equal(phoneResults[0].name, 'Carlo Reyes');
 });
 
+test('buyer directory is alphabetical by name', async () => {
+  const buyers = await (await fetch(`${baseUrl}/api/buyers`)).json();
+  assert.deepEqual(buyers.map((buyer) => buyer.name), ['Angela Cruz', 'Carlo Reyes', 'Maria Santos']);
+});
+
 test('invalid buyer payload returns field errors', async () => {
   const response = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   assert.equal(response.status, 400);

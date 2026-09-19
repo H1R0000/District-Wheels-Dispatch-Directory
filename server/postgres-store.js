@@ -40,7 +40,7 @@ export class PostgresStore {
       LEFT JOIN addresses a ON a.buyer_id = b.id
       LEFT JOIN pickup_locations p ON p.buyer_id = b.id
       WHERE $1 = '%%' OR b.name ILIKE $1 OR REPLACE(b.phone, ' ', '') ILIKE REPLACE($1, ' ', '')
-      GROUP BY b.id ORDER BY b.name`, [needle]);
+      GROUP BY b.id ORDER BY LOWER(b.name), b.name, b.id`, [needle]);
     return rows.map((row) => ({ id: row.id, name: row.name, phone: row.phone, preferredCourier: row.preferred_courier, addressCount: row.address_count, pickupCount: row.pickup_count }));
   }
 
