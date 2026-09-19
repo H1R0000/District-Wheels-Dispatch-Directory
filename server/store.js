@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { seedBuyers } from './seed-data.js';
+import { normalizePhone } from './phone.js';
 
 const clone = (value) => structuredClone(value);
 
@@ -13,13 +14,14 @@ function normalizeDefaults(items) {
 }
 
 function prepareBuyer(input, existingId) {
+  const phone = normalizePhone(input.phone);
   return {
     id: existingId ?? `buyer-${randomUUID()}`,
     name: input.name.trim(),
-    phone: input.phone.trim(),
+    phone,
     preferredCourier: input.preferredCourier,
-    addresses: normalizeDefaults((input.addresses ?? []).map((item) => ({ ...item, recipientName: input.name.trim(), recipientPhone: input.phone.trim(), id: item.id || `address-${randomUUID()}` }))),
-    pickups: normalizeDefaults((input.pickups ?? []).map((item) => ({ ...item, recipientName: input.name.trim(), recipientPhone: input.phone.trim(), id: item.id || `pickup-${randomUUID()}` }))),
+    addresses: normalizeDefaults((input.addresses ?? []).map((item) => ({ ...item, recipientName: input.name.trim(), recipientPhone: phone, id: item.id || `address-${randomUUID()}` }))),
+    pickups: normalizeDefaults((input.pickups ?? []).map((item) => ({ ...item, recipientName: input.name.trim(), recipientPhone: phone, id: item.id || `pickup-${randomUUID()}` }))),
   };
 }
 
@@ -28,9 +30,9 @@ export class MemoryStore {
 
   async list(query = '') {
     const needle = query.trim().toLocaleLowerCase('en-PH');
-    const compact = needle.replace(/\s/g, '');
+    const phoneNeedle = normalizePhone(query);
     return clone(this.buyers
-      .filter((buyer) => !needle || buyer.name.toLocaleLowerCase('en-PH').includes(needle) || buyer.phone.replace(/\s/g, '').includes(compact))
+      .filter((buyer) => !needle || buyer.name.toLocaleLowerCase('en-PH').includes(needle) || (phoneNeedle && normalizePhone(buyer.phone).includes(phoneNeedle)))
       .sort((left, right) => left.name.localeCompare(right.name, 'en-PH', { sensitivity: 'base', numeric: true }))
       .map(({ addresses, pickups, ...summary }) => ({ ...summary, addressCount: addresses.length, pickupCount: pickups.length })));
   }

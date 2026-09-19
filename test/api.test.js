@@ -25,7 +25,7 @@ test('buyer search matches names and phone numbers', async () => {
   assert.equal(nameResults.length, 1);
   assert.equal(nameResults[0].name, 'Maria Santos');
   assert.equal('addresses' in nameResults[0], false);
-  const phoneResults = await (await fetch(`${baseUrl}/api/buyers?q=0918204`)).json();
+  const phoneResults = await (await fetch(`${baseUrl}/api/buyers?q=${encodeURIComponent('(0918) 204')}`)).json();
   assert.equal(phoneResults[0].name, 'Carlo Reyes');
 });
 
@@ -49,13 +49,14 @@ test('J&T requires a complete address', async () => {
 });
 
 test('LBC branch pickup reuses the buyer name and phone', async () => {
-  const payload = { name: 'Pickup Buyer', phone: '0918 222 3333', preferredCourier: 'LBC', addresses: [], pickups: [{ branchName: 'LBC Test Branch', branchAddress: '1 Branch Road, Manila', isDefault: true }] };
+  const payload = { name: 'Pickup Buyer', phone: '(0917) 180 3828', preferredCourier: 'LBC', addresses: [], pickups: [{ branchName: 'LBC Test Branch', branchAddress: '1 Branch Road, Manila', isDefault: true }] };
   const createResponse = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   assert.equal(createResponse.status, 201);
   const created = await createResponse.json();
   assert.equal(created.addresses.length, 0);
   assert.equal(created.pickups[0].recipientName, 'Pickup Buyer');
-  assert.equal(created.pickups[0].recipientPhone, '0918 222 3333');
+  assert.equal(created.phone, '09171803828');
+  assert.equal(created.pickups[0].recipientPhone, '09171803828');
   await fetch(`${baseUrl}/api/buyers/${created.id}`, { method: 'DELETE' });
 });
 
@@ -73,9 +74,13 @@ test('buyer can be created, updated, and deleted with one normalized default', a
   assert.equal(created.addresses.filter((item) => item.isDefault).length, 1);
 
   created.name = 'Updated Buyer';
+  created.phone = '(0917) 180 3828';
   const updateResponse = await fetch(`${baseUrl}/api/buyers/${created.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(created) });
   assert.equal(updateResponse.status, 200);
-  assert.equal((await updateResponse.json()).name, 'Updated Buyer');
+  const updated = await updateResponse.json();
+  assert.equal(updated.name, 'Updated Buyer');
+  assert.equal(updated.phone, '09171803828');
+  assert.equal(updated.addresses[0].recipientPhone, '09171803828');
 
   assert.equal((await fetch(`${baseUrl}/api/buyers/${created.id}`, { method: 'DELETE' })).status, 204);
   assert.equal((await fetch(`${baseUrl}/api/buyers/${created.id}`)).status, 404);

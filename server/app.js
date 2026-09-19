@@ -2,6 +2,7 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { MemoryStore } from './store.js';
+import { normalizePhone } from './phone.js';
 
 const textFields = ['name', 'phone'];
 const addressFields = ['street', 'barangay', 'city', 'province', 'zipCode'];
@@ -10,6 +11,7 @@ const pickupFields = ['branchName', 'branchAddress'];
 function validateBuyer(body) {
   const errors = {};
   for (const field of textFields) if (!String(body[field] ?? '').trim()) errors[field] = 'This field is required.';
+  if (String(body.phone ?? '').trim() && !normalizePhone(body.phone)) errors.phone = 'Enter a valid phone number.';
   if (!['LBC', 'J&T Express'].includes(body.preferredCourier)) errors.preferredCourier = 'Choose a supported courier.';
   const hasAddress = Array.isArray(body.addresses) && body.addresses.length > 0;
   const hasPickup = Array.isArray(body.pickups) && body.pickups.length > 0;
