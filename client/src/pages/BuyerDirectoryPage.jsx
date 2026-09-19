@@ -29,9 +29,12 @@ export default function BuyerDirectoryPage() {
   return (
     <div className="page">
       <section className="hero">
-        <p className="eyebrow">Buyer directory</p>
-        <h1>Find shipping details quickly.</h1>
-        <p>Search repeat buyers by name or phone number, then copy the information needed for dispatch.</p>
+        <div>
+          <p className="eyebrow">Buyer directory</p>
+          <h1>Find shipping details quickly.</h1>
+          <p>Search repeat buyers by name or phone number, then copy the information needed for dispatch.</p>
+        </div>
+        <Link className="button button-primary hero-action" to="/buyers/new">+ Add buyer</Link>
       </section>
 
       <section className="panel" aria-labelledby="directory-heading">
@@ -65,7 +68,7 @@ export default function BuyerDirectoryPage() {
                   <span className="avatar" aria-hidden="true">{buyer.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span>
                   <span className="buyer-summary">
                     <strong>{buyer.name}</strong>
-                    <span>{buyer.phone}</span>
+                    <span>{buyer.phone} · {buyer.addressCount} address{buyer.addressCount === 1 ? '' : 'es'}</span>
                   </span>
                   <span className="courier-tag">{buyer.preferredCourier}</span>
                   <span className="open-label">View <span aria-hidden="true">→</span></span>

@@ -4,3 +4,4 @@ node_modules/
 tmp/
 client/dist/
 coverage/
+data/dev-db.json
