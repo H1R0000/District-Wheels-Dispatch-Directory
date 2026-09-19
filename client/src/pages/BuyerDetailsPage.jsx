@@ -27,6 +27,7 @@ export default function BuyerDetailsPage() {
         if (!response.ok) throw new Error('Request failed');
         const result = await response.json();
         setBuyer(result);
+        setShippingMethod(result.addresses.length === 0 && result.pickups.length > 0 ? 'pickup' : 'door');
         setSelectedAddressId((result.addresses.find((item) => item.isDefault) ?? result.addresses[0])?.id ?? '');
         setSelectedPickupId((result.pickups.find((item) => item.isDefault) ?? result.pickups[0])?.id ?? '');
         setStatus('ready');

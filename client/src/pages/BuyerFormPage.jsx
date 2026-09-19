@@ -2,19 +2,19 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react';
 
-const emptyAddress = () => ({ recipientName: '', recipientPhone: '', street: '', barangay: '', city: '', province: '', zipCode: '', isDefault: false });
-const emptyPickup = () => ({ recipientName: '', recipientPhone: '', branchName: '', branchAddress: '', isDefault: false });
+const emptyAddress = () => ({ street: '', barangay: '', city: '', province: '', zipCode: '', isDefault: false });
+const emptyPickup = () => ({ branchName: '', branchAddress: '', isDefault: false });
 const emptyBuyer = () => ({ name: '', phone: '', preferredCourier: 'LBC', addresses: [{ ...emptyAddress(), isDefault: true }], pickups: [] });
 
 const addressFields = [
-  ['recipientName', 'Recipient name'], ['recipientPhone', 'Recipient phone'], ['street', 'Street / building'],
-  ['barangay', 'Barangay'], ['city', 'City / municipality'], ['province', 'Province'], ['zipCode', 'ZIP code'],
+  ['street', 'Street / building'], ['barangay', 'Barangay'], ['city', 'City / municipality'],
+  ['province', 'Province'], ['zipCode', 'ZIP code'],
 ];
 const pickupFields = [
-  ['recipientName', 'Recipient name'], ['recipientPhone', 'Recipient phone'], ['branchName', 'LBC branch name'], ['branchAddress', 'Branch address'],
+  ['branchName', 'LBC branch name'], ['branchAddress', 'Complete branch address'],
 ];
 
-function LocationEditor({ title, type, items, setItems, fields, createItem, required }) {
+function LocationEditor({ title, description, type, items, setItems, fields, createItem, required }) {
   const singular = type === 'addresses' ? 'address' : 'pickup location';
   function update(index, field, value) {
     setItems(items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
@@ -33,7 +33,7 @@ function LocationEditor({ title, type, items, setItems, fields, createItem, requ
   return (
     <section className="panel form-section">
       <div className="section-heading">
-        <div><h2>{title}</h2><p>{required ? 'At least one is required.' : 'Optional; used for LBC branch pickup.'}</p></div>
+        <div><h2>{title}</h2><p>{description}</p></div>
         <button type="button" className="button button-secondary" onClick={() => setItems([...items, { ...createItem(), isDefault: items.length === 0 }])}><Plus size={17} aria-hidden="true" />Add</button>
       </div>
       {items.length === 0 && <p className="state-message">No {type === 'addresses' ? 'addresses' : 'pickup locations'} added.</p>}
@@ -65,6 +65,7 @@ export default function BuyerFormPage() {
   const navigate = useNavigate();
   const isEditing = Boolean(buyerId);
   const [buyer, setBuyer] = useState(emptyBuyer);
+  const [deliveryMethod, setDeliveryMethod] = useState('door');
   const [status, setStatus] = useState(isEditing ? 'loading' : 'ready');
   const [message, setMessage] = useState('');
 
@@ -76,7 +77,11 @@ export default function BuyerFormPage() {
         if (!response.ok) throw new Error('Buyer could not be loaded.');
         return response.json();
       })
-      .then((data) => { setBuyer(data); setStatus('ready'); })
+      .then((data) => {
+        setBuyer(data);
+        setDeliveryMethod(data.preferredCourier === 'LBC' && data.addresses.length === 0 && data.pickups.length > 0 ? 'pickup' : 'door');
+        setStatus('ready');
+      })
       .catch((error) => { if (error.name !== 'AbortError') { setMessage(error.message); setStatus('error'); } });
     return () => controller.abort();
   }, [buyerId, isEditing]);
@@ -86,10 +91,15 @@ export default function BuyerFormPage() {
     setStatus('saving');
     setMessage('');
     try {
+      const payload = {
+        ...buyer,
+        addresses: deliveryMethod === 'door' ? buyer.addresses : [],
+        pickups: buyer.preferredCourier === 'LBC' && deliveryMethod === 'pickup' ? buyer.pickups : [],
+      };
       const response = await fetch(isEditing ? `/api/buyers/${buyerId}` : '/api/buyers', {
         method: isEditing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buyer),
+        body: JSON.stringify(payload),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? 'The buyer could not be saved.');
@@ -112,12 +122,25 @@ export default function BuyerFormPage() {
           <div className="form-grid">
             <label><span>Full name</span><input required value={buyer.name} onChange={(event) => setBuyer({ ...buyer, name: event.target.value })} /></label>
             <label><span>Phone number</span><input required inputMode="tel" value={buyer.phone} onChange={(event) => setBuyer({ ...buyer, phone: event.target.value })} /></label>
-            <label><span>Preferred courier</span><select value={buyer.preferredCourier} onChange={(event) => setBuyer({ ...buyer, preferredCourier: event.target.value })}><option>LBC</option><option>J&amp;T Express</option></select></label>
+            <label><span>Preferred courier</span><select value={buyer.preferredCourier} onChange={(event) => { const preferredCourier = event.target.value; setBuyer({ ...buyer, preferredCourier, addresses: buyer.addresses.length ? buyer.addresses : [{ ...emptyAddress(), isDefault: true }] }); if (preferredCourier === 'J&T Express') setDeliveryMethod('door'); }}><option value="LBC">LBC</option><option value="J&T Express">J&amp;T Express</option></select></label>
           </div>
         </section>
 
-        <LocationEditor title="Addresses" type="addresses" items={buyer.addresses} setItems={(addresses) => setBuyer({ ...buyer, addresses })} fields={addressFields} createItem={emptyAddress} required />
-        <LocationEditor title="LBC pickup locations" type="pickups" items={buyer.pickups} setItems={(pickups) => setBuyer({ ...buyer, pickups })} fields={pickupFields} createItem={emptyPickup} />
+        {buyer.preferredCourier === 'LBC' && (
+          <fieldset className="panel form-section delivery-choice">
+            <legend>How will LBC deliver this buyer’s orders?</legend>
+            <div className="choice-grid">
+              <label className={deliveryMethod === 'door' ? 'selected' : ''}><input type="radio" name="deliveryMethod" value="door" checked={deliveryMethod === 'door'} onChange={() => { setDeliveryMethod('door'); if (buyer.addresses.length === 0) setBuyer({ ...buyer, addresses: [{ ...emptyAddress(), isDefault: true }] }); }} /><span><strong>Door to door</strong><small>Deliver to the buyer’s complete address.</small></span></label>
+              <label className={deliveryMethod === 'pickup' ? 'selected' : ''}><input type="radio" name="deliveryMethod" value="pickup" checked={deliveryMethod === 'pickup'} onChange={() => { setDeliveryMethod('pickup'); if (buyer.pickups.length === 0) setBuyer({ ...buyer, pickups: [{ ...emptyPickup(), isDefault: true }] }); }} /><span><strong>Branch pickup</strong><small>Send the parcel to a selected LBC branch.</small></span></label>
+            </div>
+          </fieldset>
+        )}
+
+        {deliveryMethod === 'door' ? (
+          <LocationEditor title={buyer.preferredCourier === 'J&T Express' ? 'J&T delivery address' : 'LBC door-to-door address'} description="Name and phone will be taken from the buyer information above." type="addresses" items={buyer.addresses} setItems={(addresses) => setBuyer({ ...buyer, addresses })} fields={addressFields} createItem={emptyAddress} required />
+        ) : (
+          <LocationEditor title="LBC branch pickup" description="Choose the branch where this buyer will collect the parcel. Name and phone come from above." type="pickups" items={buyer.pickups} setItems={(pickups) => setBuyer({ ...buyer, pickups })} fields={pickupFields} createItem={emptyPickup} required />
+        )}
 
         {message && <p className="form-error" role="alert">{message}</p>}
         <div className="form-actions">

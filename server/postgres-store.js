@@ -75,8 +75,8 @@ export class PostgresStore {
         await client.query('DELETE FROM addresses WHERE buyer_id = $1', [id]);
         await client.query('DELETE FROM pickup_locations WHERE buyer_id = $1', [id]);
       }
-      for (const item of addresses) await client.query('INSERT INTO addresses (id, buyer_id, recipient_name, recipient_phone, street, barangay, city, province, zip_code, is_default) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [item.id || `address-${randomUUID()}`, id, item.recipientName, item.recipientPhone, item.street, item.barangay, item.city, item.province, item.zipCode, item.isDefault]);
-      for (const item of pickups) await client.query('INSERT INTO pickup_locations (id, buyer_id, recipient_name, recipient_phone, branch_name, branch_address, is_default) VALUES ($1,$2,$3,$4,$5,$6,$7)', [item.id || `pickup-${randomUUID()}`, id, item.recipientName, item.recipientPhone, item.branchName, item.branchAddress, item.isDefault]);
+      for (const item of addresses) await client.query('INSERT INTO addresses (id, buyer_id, recipient_name, recipient_phone, street, barangay, city, province, zip_code, is_default) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [item.id || `address-${randomUUID()}`, id, input.name.trim(), input.phone.trim(), item.street, item.barangay, item.city, item.province, item.zipCode, item.isDefault]);
+      for (const item of pickups) await client.query('INSERT INTO pickup_locations (id, buyer_id, recipient_name, recipient_phone, branch_name, branch_address, is_default) VALUES ($1,$2,$3,$4,$5,$6,$7)', [item.id || `pickup-${randomUUID()}`, id, input.name.trim(), input.phone.trim(), item.branchName, item.branchAddress, item.isDefault]);
       await client.query('COMMIT');
       return this.get(id);
     } catch (error) { await client.query('ROLLBACK'); throw error; }

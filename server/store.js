@@ -18,8 +18,8 @@ function prepareBuyer(input, existingId) {
     name: input.name.trim(),
     phone: input.phone.trim(),
     preferredCourier: input.preferredCourier,
-    addresses: normalizeDefaults((input.addresses ?? []).map((item) => ({ ...item, id: item.id || `address-${randomUUID()}` }))),
-    pickups: normalizeDefaults((input.pickups ?? []).map((item) => ({ ...item, id: item.id || `pickup-${randomUUID()}` }))),
+    addresses: normalizeDefaults((input.addresses ?? []).map((item) => ({ ...item, recipientName: input.name.trim(), recipientPhone: input.phone.trim(), id: item.id || `address-${randomUUID()}` }))),
+    pickups: normalizeDefaults((input.pickups ?? []).map((item) => ({ ...item, recipientName: input.name.trim(), recipientPhone: input.phone.trim(), id: item.id || `pickup-${randomUUID()}` }))),
   };
 }
 

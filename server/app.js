@@ -4,14 +4,17 @@ import { resolve } from 'node:path';
 import { MemoryStore } from './store.js';
 
 const textFields = ['name', 'phone'];
-const addressFields = ['recipientName', 'recipientPhone', 'street', 'barangay', 'city', 'province', 'zipCode'];
-const pickupFields = ['recipientName', 'recipientPhone', 'branchName', 'branchAddress'];
+const addressFields = ['street', 'barangay', 'city', 'province', 'zipCode'];
+const pickupFields = ['branchName', 'branchAddress'];
 
 function validateBuyer(body) {
   const errors = {};
   for (const field of textFields) if (!String(body[field] ?? '').trim()) errors[field] = 'This field is required.';
   if (!['LBC', 'J&T Express'].includes(body.preferredCourier)) errors.preferredCourier = 'Choose a supported courier.';
-  if (!Array.isArray(body.addresses) || body.addresses.length === 0) errors.addresses = 'Add at least one normal address.';
+  const hasAddress = Array.isArray(body.addresses) && body.addresses.length > 0;
+  const hasPickup = Array.isArray(body.pickups) && body.pickups.length > 0;
+  if (body.preferredCourier === 'J&T Express' && !hasAddress) errors.addresses = 'Add a complete J&T delivery address.';
+  if (body.preferredCourier === 'LBC' && !hasAddress && !hasPickup) errors.locations = 'Choose LBC door to door or branch pickup and add its details.';
   (body.addresses ?? []).forEach((address, index) => {
     for (const field of addressFields) if (!String(address[field] ?? '').trim()) errors[`addresses.${index}.${field}`] = 'Required';
   });

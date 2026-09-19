@@ -34,7 +34,24 @@ test('invalid buyer payload returns field errors', async () => {
   assert.equal(response.status, 400);
   const result = await response.json();
   assert.equal(result.errors.name, 'This field is required.');
-  assert.equal(result.errors.addresses, 'Add at least one normal address.');
+  assert.equal(result.errors.preferredCourier, 'Choose a supported courier.');
+});
+
+test('J&T requires a complete address', async () => {
+  const response = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'J&T Buyer', phone: '0918 000 0000', preferredCourier: 'J&T Express', addresses: [], pickups: [] }) });
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).errors.addresses, 'Add a complete J&T delivery address.');
+});
+
+test('LBC branch pickup reuses the buyer name and phone', async () => {
+  const payload = { name: 'Pickup Buyer', phone: '0918 222 3333', preferredCourier: 'LBC', addresses: [], pickups: [{ branchName: 'LBC Test Branch', branchAddress: '1 Branch Road, Manila', isDefault: true }] };
+  const createResponse = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  assert.equal(createResponse.status, 201);
+  const created = await createResponse.json();
+  assert.equal(created.addresses.length, 0);
+  assert.equal(created.pickups[0].recipientName, 'Pickup Buyer');
+  assert.equal(created.pickups[0].recipientPhone, '0918 222 3333');
+  await fetch(`${baseUrl}/api/buyers/${created.id}`, { method: 'DELETE' });
 });
 
 test('buyer can be created, updated, and deleted with one normalized default', async () => {
