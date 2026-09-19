@@ -54,7 +54,7 @@ export default function BuyerDirectoryPage() {
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search Maria or 0917"
+            placeholder="Search Hero or 09"
           />
         </label>
       </section>
