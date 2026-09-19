@@ -4,7 +4,7 @@
 
 District Wheels Dispatch Directory is a planned fulfillment tool for the District Wheels fulfillment manager. It will help the manager find a repeat buyer and copy saved shipping information into LBC or J&T Express forms with fewer repeated lookups and typing errors.
 
-The current Week 1 increment is written project documentation. It covers the four planned screens, component architecture, primary task flow, responsive behavior, and design system before the React, Express, and PostgreSQL implementation begins.
+The project is currently in the planning and documentation stage. Coding has not started yet. The Week 1 work covers the four planned screens, component architecture, primary task flow, responsive behavior, and design system before the React, Express, and PostgreSQL implementation begins.
 
 ## 2. Setup and installation
 
@@ -28,11 +28,11 @@ No application setup or dependency installation is required. The repository curr
 
 ### Install dependencies
 
-There are no dependencies to install. Markdown files can be read directly on GitHub, while the exported PDFs and images can be opened with their usual viewers.
+There are no dependencies to install. Markdown files can be read directly on GitHub, while the exported PDFs can be opened with a PDF viewer.
 
 ### Environment and configuration
 
-The current prototype requires no environment variables, secrets, or external services.
+The current planning documentation requires no environment variables, secrets, or external services.
 
 Do not add real buyer records or courier credentials to the repository. The finished application will use placeholder values in an `.env.example` file and keep real secrets in an untracked `.env` file.
 
@@ -85,14 +85,13 @@ Use the task-flow section of the wireframe documentation to follow the primary f
 
 ### Current endpoints
 
-The Week 1 prototype has no API endpoints. Planned Express routes will cover buyers, addresses, LBC pickup locations, and couriers after the database is implemented.
+No API endpoints exist because coding has not started. Planned Express routes will cover buyers, addresses, LBC pickup locations, and couriers after the database is implemented.
 
 ## 5. Project structure
 
 ```text
 DCW_Dispatch_Directory/
 |-- docs/
-|   |-- images/             # README screenshots
 |   |-- pdf/                # Exported wireframe and design-system PDFs
 |   |-- proposal.md         # Project proposal
 |   |-- wireframes.md       # Detailed wireframe documentation
@@ -100,21 +99,11 @@ DCW_Dispatch_Directory/
 `-- README.md               # Project documentation
 ```
 
-## 6. Screenshots
-
-### Desktop wireframe comparison
-
-![Desktop view of the responsive District Wheels wireframe board](docs/images/wireframe-board.png)
-
-### Phone layout
-
-![Phone-width view of the District Wheels screen map](docs/images/wireframe-mobile.png)
-
-## 7. Known issues and next steps
+## 6. Known issues and next steps
 
 ### Known issues
 
-- The project currently contains planning documentation, not the finished dispatch application.
+- Coding has not started; the repository currently contains planning documentation rather than a working application.
 - Buyer records, addresses, pickup locations, and courier choices are placeholders.
 - Search, copy, create, edit, delete, and save controls do not yet perform data operations.
 - The database rule that allows only one default address and one default LBC pickup location per buyer is designed but not implemented or tested.
