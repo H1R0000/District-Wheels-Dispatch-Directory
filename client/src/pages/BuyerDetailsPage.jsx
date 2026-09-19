@@ -73,7 +73,7 @@ export default function BuyerDetailsPage() {
       <div className="detail-grid">
         <section className="panel" aria-labelledby="contact-heading">
           <div className="section-heading"><div><h2 id="contact-heading">Contact</h2><p>Copy one value at a time.</p></div></div>
-          <div className="field-stack"><CopyField label="Recipient name" value={buyer.name} /><CopyField label="Phone number" value={buyer.phone} copyValue={phoneForCourier(buyer.phone)} /></div>
+          <div className="field-stack"><CopyField label="Recipient name" value={buyer.name} /><CopyField label="Phone number" value={buyer.phone} clipboardValue={phoneForCourier(buyer.phone)} /></div>
         </section>
 
         <section className="panel shipping-panel" aria-labelledby="shipping-heading">
@@ -89,7 +89,7 @@ export default function BuyerDetailsPage() {
           {location ? (
             <div className="field-stack">
               <CopyField label="Recipient name" value={location.recipientName} />
-              <CopyField label="Recipient phone" value={location.recipientPhone} copyValue={phoneForCourier(location.recipientPhone)} />
+              <CopyField label="Recipient phone" value={location.recipientPhone} clipboardValue={phoneForCourier(location.recipientPhone)} />
               {shippingMethod === 'door' ? <><CopyField label="Street" value={address.street} /><CopyField label="Barangay" value={address.barangay} /><CopyField label="City" value={address.city} /><CopyField label="Province" value={address.province} /><CopyField label="ZIP code" value={address.zipCode} /></> : <><CopyField label="LBC branch" value={pickup.branchName} /><CopyField label="Branch address" value={pickup.branchAddress} /></>}
               <div className="copy-all-row"><button className="button button-primary" type="button" onClick={copyGroup}><ClipboardCopy size={18} aria-hidden="true" />Copy all shipping details</button><span aria-live="polite">{copyStatus}</span></div>
             </div>

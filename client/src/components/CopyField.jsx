@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 
-export default function CopyField({ label, value, copyValue = value }) {
+export default function CopyField({ label, value, clipboardValue = value }) {
   const [status, setStatus] = useState('');
 
   useEffect(() => {
@@ -10,9 +10,9 @@ export default function CopyField({ label, value, copyValue = value }) {
     return () => window.clearTimeout(timer);
   }, [status]);
 
-  async function copyValue() {
+  async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(copyValue);
+      await navigator.clipboard.writeText(clipboardValue);
       setStatus('Copied');
     } catch {
       setStatus('Copy failed');
@@ -26,7 +26,7 @@ export default function CopyField({ label, value, copyValue = value }) {
         <span className="field-value">{value}</span>
       </div>
       <div className="copy-action">
-        <button type="button" className="button button-secondary" onClick={copyValue}>{status === 'Copied' ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}{status === 'Copied' ? 'Copied' : 'Copy'}</button>
+        <button type="button" className="button button-secondary" onClick={handleCopy}>{status === 'Copied' ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}{status === 'Copied' ? 'Copied' : 'Copy'}</button>
         <span className="copy-status" aria-live="polite">{status}</span>
       </div>
     </div>
