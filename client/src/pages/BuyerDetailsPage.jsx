@@ -64,7 +64,7 @@ export default function BuyerDetailsPage() {
     <div className="page">
       <Link className="back-link" to="/">← Buyer directory</Link>
       <section className="detail-hero">
-        <div><p className="eyebrow">Buyer details</p><h1>{buyer.name}</h1><p>Preferred courier: <strong>{buyer.preferredCourier}</strong></p></div>
+        <div><h1>{buyer.name}</h1><p>Preferred courier: <strong>{buyer.preferredCourier}</strong></p></div>
         <div className="detail-actions"><Link className="button button-secondary" to={`/buyers/${buyer.id}/edit`}>Edit buyer</Link><button className="button button-danger" type="button" onClick={deleteBuyer} disabled={status === 'deleting'}>{status === 'deleting' ? 'Deleting…' : 'Delete'}</button></div>
       </section>
 

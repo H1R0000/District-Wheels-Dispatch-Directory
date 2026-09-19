@@ -104,7 +104,7 @@ export default function BuyerFormPage() {
   return (
     <div className="page form-page">
       <Link className="back-link" to={isEditing ? `/buyers/${buyerId}` : '/'}>← {isEditing ? 'Buyer details' : 'Buyer directory'}</Link>
-      <div className="form-title"><p className="eyebrow">{isEditing ? 'Edit buyer' : 'New buyer'}</p><h1>{isEditing ? `Update ${buyer.name}` : 'Add a buyer'}</h1><p>Use fictional information for development and demonstrations.</p></div>
+      <div className="form-title"><h1>{isEditing ? `Update ${buyer.name}` : 'Add a buyer'}</h1><p>Use fictional information for development and demonstrations.</p></div>
       <form onSubmit={submit}>
         <section className="panel form-section">
           <div className="section-heading"><div><h2>Buyer information</h2><p>Contact and courier preference.</p></div></div>

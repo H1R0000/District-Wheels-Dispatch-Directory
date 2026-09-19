@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import BuyerCard from '../components/BuyerCard.jsx';
 
 export default function BuyerDirectoryPage() {
   const [query, setQuery] = useState('');
@@ -30,31 +31,33 @@ export default function BuyerDirectoryPage() {
     <div className="page">
       <section className="hero">
         <div>
-          <p className="eyebrow">Buyer directory</p>
-          <h1>Find shipping details quickly.</h1>
-          <p>Search repeat buyers by name or phone number, then copy the information needed for dispatch.</p>
+          <h1>Buyer dispatch records</h1>
+          <p>Find a repeat buyer and move their saved shipping details into the courier form.</p>
         </div>
         <Link className="button button-primary hero-action" to="/buyers/new">+ Add buyer</Link>
       </section>
 
-      <section className="panel" aria-labelledby="directory-heading">
+      <section className="finder" aria-labelledby="directory-heading">
         <div className="section-heading">
           <div>
-            <h2 id="directory-heading">Buyers</h2>
-            <p>Fictional records for development only.</p>
+            <h2 id="directory-heading">Find a buyer</h2>
+            <p>Name or phone number</p>
           </div>
-          <span className="count-badge">{buyers.length} found</span>
+          <strong className="result-count">{buyers.length} record{buyers.length === 1 ? '' : 's'}</strong>
         </div>
 
         <label className="search-field">
-          <span>Search by name or phone</span>
+          <span className="sr-only">Search by name or phone</span>
           <input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Try Maria or 0917"
+            placeholder="Search Maria or 0917"
           />
         </label>
+      </section>
+
+      <section className="records" aria-label="Buyer records">
 
         {status === 'loading' && <p className="state-message">Loading buyers…</p>}
         {status === 'error' && <p className="state-message error">The buyer directory could not be loaded.</p>}
@@ -62,19 +65,7 @@ export default function BuyerDirectoryPage() {
 
         {status === 'ready' && buyers.length > 0 && (
           <ul className="buyer-list">
-            {buyers.map((buyer) => (
-              <li key={buyer.id}>
-                <Link className="buyer-card" to={`/buyers/${buyer.id}`}>
-                  <span className="avatar" aria-hidden="true">{buyer.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span>
-                  <span className="buyer-summary">
-                    <strong>{buyer.name}</strong>
-                    <span>{buyer.phone} · {buyer.addressCount} address{buyer.addressCount === 1 ? '' : 'es'}</span>
-                  </span>
-                  <span className="courier-tag">{buyer.preferredCourier}</span>
-                  <span className="open-label">View <span aria-hidden="true">→</span></span>
-                </Link>
-              </li>
-            ))}
+            {buyers.map((buyer, index) => <BuyerCard buyer={buyer} index={index} key={buyer.id} />)}
           </ul>
         )}
       </section>
