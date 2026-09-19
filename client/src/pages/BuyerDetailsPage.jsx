@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ClipboardCopy, Pencil, Trash2 } from 'lucide-react';
 import CopyField from '../components/CopyField.jsx';
+import { phoneForCourier } from '../utils/phone.js';
 
 async function copyText(value) {
   await navigator.clipboard.writeText(value);
@@ -40,8 +41,8 @@ export default function BuyerDetailsPage() {
 
   async function copyGroup() {
     const lines = shippingMethod === 'door' && address
-      ? [address.recipientName, address.recipientPhone, address.street, address.barangay, address.city, address.province, address.zipCode]
-      : pickup ? [pickup.recipientName, pickup.recipientPhone, pickup.branchName, pickup.branchAddress] : [];
+      ? [address.recipientName, phoneForCourier(address.recipientPhone), address.street, address.barangay, address.city, address.province, address.zipCode]
+      : pickup ? [pickup.recipientName, phoneForCourier(pickup.recipientPhone), pickup.branchName, pickup.branchAddress] : [];
     try { await copyText(lines.join('\n')); setCopyStatus('All shipping details copied.'); }
     catch { setCopyStatus('Copy failed. Select the text manually.'); }
     window.setTimeout(() => setCopyStatus(''), 2200);
@@ -72,7 +73,7 @@ export default function BuyerDetailsPage() {
       <div className="detail-grid">
         <section className="panel" aria-labelledby="contact-heading">
           <div className="section-heading"><div><h2 id="contact-heading">Contact</h2><p>Copy one value at a time.</p></div></div>
-          <div className="field-stack"><CopyField label="Recipient name" value={buyer.name} /><CopyField label="Phone number" value={buyer.phone} /></div>
+          <div className="field-stack"><CopyField label="Recipient name" value={buyer.name} /><CopyField label="Phone number" value={buyer.phone} copyValue={phoneForCourier(buyer.phone)} /></div>
         </section>
 
         <section className="panel shipping-panel" aria-labelledby="shipping-heading">
@@ -88,7 +89,7 @@ export default function BuyerDetailsPage() {
           {location ? (
             <div className="field-stack">
               <CopyField label="Recipient name" value={location.recipientName} />
-              <CopyField label="Recipient phone" value={location.recipientPhone} />
+              <CopyField label="Recipient phone" value={location.recipientPhone} copyValue={phoneForCourier(location.recipientPhone)} />
               {shippingMethod === 'door' ? <><CopyField label="Street" value={address.street} /><CopyField label="Barangay" value={address.barangay} /><CopyField label="City" value={address.city} /><CopyField label="Province" value={address.province} /><CopyField label="ZIP code" value={address.zipCode} /></> : <><CopyField label="LBC branch" value={pickup.branchName} /><CopyField label="Branch address" value={pickup.branchAddress} /></>}
               <div className="copy-all-row"><button className="button button-primary" type="button" onClick={copyGroup}><ClipboardCopy size={18} aria-hidden="true" />Copy all shipping details</button><span aria-live="polite">{copyStatus}</span></div>
             </div>

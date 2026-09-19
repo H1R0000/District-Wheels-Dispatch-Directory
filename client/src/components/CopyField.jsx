@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 
-export default function CopyField({ label, value }) {
+export default function CopyField({ label, value, copyValue = value }) {
   const [status, setStatus] = useState('');
 
   useEffect(() => {
@@ -12,7 +12,7 @@ export default function CopyField({ label, value }) {
 
   async function copyValue() {
     try {
-      await navigator.clipboard.writeText(value);
+      await navigator.clipboard.writeText(copyValue);
       setStatus('Copied');
     } catch {
       setStatus('Copy failed');
