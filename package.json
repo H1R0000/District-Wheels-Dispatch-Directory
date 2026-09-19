@@ -9,10 +9,13 @@
     "dev:client": "vite --config client/vite.config.js",
     "start": "node server/index.js",
     "build": "vite build --config client/vite.config.js",
-    "test": "node --test"
+    "test": "node --test test/api.test.js"
   },
   "dependencies": {
+    "@fontsource/barlow-condensed": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
     "express": "^5.1.0",
+    "lucide-react": "^1.47.0",
     "pg": "^8.23.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

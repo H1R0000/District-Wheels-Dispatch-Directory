@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, ClipboardCopy, Pencil, Trash2 } from 'lucide-react';
 import CopyField from '../components/CopyField.jsx';
 
 async function copyText(value) {
@@ -62,10 +63,10 @@ export default function BuyerDetailsPage() {
 
   return (
     <div className="page">
-      <Link className="back-link" to="/">← Buyer directory</Link>
+      <Link className="back-link" to="/"><ArrowLeft size={16} aria-hidden="true" />Buyer directory</Link>
       <section className="detail-hero">
         <div><h1>{buyer.name}</h1><p>Preferred courier: <strong>{buyer.preferredCourier}</strong></p></div>
-        <div className="detail-actions"><Link className="button button-secondary" to={`/buyers/${buyer.id}/edit`}>Edit buyer</Link><button className="button button-danger" type="button" onClick={deleteBuyer} disabled={status === 'deleting'}>{status === 'deleting' ? 'Deleting…' : 'Delete'}</button></div>
+        <div className="detail-actions"><Link className="button button-secondary" to={`/buyers/${buyer.id}/edit`}><Pencil size={17} aria-hidden="true" />Edit buyer</Link><button className="button button-danger" type="button" onClick={deleteBuyer} disabled={status === 'deleting'}><Trash2 size={17} aria-hidden="true" />{status === 'deleting' ? 'Deleting…' : 'Delete'}</button></div>
       </section>
 
       <div className="detail-grid">
@@ -89,7 +90,7 @@ export default function BuyerDetailsPage() {
               <CopyField label="Recipient name" value={location.recipientName} />
               <CopyField label="Recipient phone" value={location.recipientPhone} />
               {shippingMethod === 'door' ? <><CopyField label="Street" value={address.street} /><CopyField label="Barangay" value={address.barangay} /><CopyField label="City" value={address.city} /><CopyField label="Province" value={address.province} /><CopyField label="ZIP code" value={address.zipCode} /></> : <><CopyField label="LBC branch" value={pickup.branchName} /><CopyField label="Branch address" value={pickup.branchAddress} /></>}
-              <div className="copy-all-row"><button className="button button-primary" type="button" onClick={copyGroup}>Copy all shipping details</button><span aria-live="polite">{copyStatus}</span></div>
+              <div className="copy-all-row"><button className="button button-primary" type="button" onClick={copyGroup}><ClipboardCopy size={18} aria-hidden="true" />Copy all shipping details</button><span aria-live="polite">{copyStatus}</span></div>
             </div>
           ) : <p className="state-message">No saved location is available for this shipping method.</p>}
         </section>

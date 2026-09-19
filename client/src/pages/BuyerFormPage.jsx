@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react';
 
 const emptyAddress = () => ({ recipientName: '', recipientPhone: '', street: '', barangay: '', city: '', province: '', zipCode: '', isDefault: false });
 const emptyPickup = () => ({ recipientName: '', recipientPhone: '', branchName: '', branchAddress: '', isDefault: false });
@@ -33,7 +34,7 @@ function LocationEditor({ title, type, items, setItems, fields, createItem, requ
     <section className="panel form-section">
       <div className="section-heading">
         <div><h2>{title}</h2><p>{required ? 'At least one is required.' : 'Optional; used for LBC branch pickup.'}</p></div>
-        <button type="button" className="button button-secondary" onClick={() => setItems([...items, { ...createItem(), isDefault: items.length === 0 }])}>+ Add</button>
+        <button type="button" className="button button-secondary" onClick={() => setItems([...items, { ...createItem(), isDefault: items.length === 0 }])}><Plus size={17} aria-hidden="true" />Add</button>
       </div>
       {items.length === 0 && <p className="state-message">No {type === 'addresses' ? 'addresses' : 'pickup locations'} added.</p>}
       <div className="location-list">
@@ -50,7 +51,7 @@ function LocationEditor({ title, type, items, setItems, fields, createItem, requ
             </div>
             <div className="location-actions">
               <label className="radio-label"><input type="radio" name={`default-${type}`} checked={item.isDefault} onChange={() => makeDefault(index)} /> Default {singular}</label>
-              <button type="button" className="text-button danger-text" onClick={() => remove(index)} disabled={required && items.length === 1}>Remove</button>
+              <button type="button" className="text-button danger-text" onClick={() => remove(index)} disabled={required && items.length === 1}><Trash2 size={15} aria-hidden="true" />Remove</button>
             </div>
           </fieldset>
         ))}
@@ -103,7 +104,7 @@ export default function BuyerFormPage() {
 
   return (
     <div className="page form-page">
-      <Link className="back-link" to={isEditing ? `/buyers/${buyerId}` : '/'}>← {isEditing ? 'Buyer details' : 'Buyer directory'}</Link>
+      <Link className="back-link" to={isEditing ? `/buyers/${buyerId}` : '/'}><ArrowLeft size={16} aria-hidden="true" />{isEditing ? 'Buyer details' : 'Buyer directory'}</Link>
       <div className="form-title"><h1>{isEditing ? `Update ${buyer.name}` : 'Add a buyer'}</h1><p>Use fictional information for development and demonstrations.</p></div>
       <form onSubmit={submit}>
         <section className="panel form-section">
@@ -121,7 +122,7 @@ export default function BuyerFormPage() {
         {message && <p className="form-error" role="alert">{message}</p>}
         <div className="form-actions">
           <Link className="button button-secondary" to={isEditing ? `/buyers/${buyerId}` : '/'}>Cancel</Link>
-          <button className="button button-primary" type="submit" disabled={status === 'saving'}>{status === 'saving' ? 'Saving…' : isEditing ? 'Save changes' : 'Create buyer'}</button>
+          <button className="button button-primary" type="submit" disabled={status === 'saving'}><Save size={17} aria-hidden="true" />{status === 'saving' ? 'Saving…' : isEditing ? 'Save changes' : 'Create buyer'}</button>
         </div>
       </form>
     </div>

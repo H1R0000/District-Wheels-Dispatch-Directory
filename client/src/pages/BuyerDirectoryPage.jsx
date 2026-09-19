@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Plus, Search } from 'lucide-react';
 import BuyerCard from '../components/BuyerCard.jsx';
 
 export default function BuyerDirectoryPage() {
@@ -34,7 +35,7 @@ export default function BuyerDirectoryPage() {
           <h1>Buyer dispatch records</h1>
           <p>Find a repeat buyer and move their saved shipping details into the courier form.</p>
         </div>
-        <Link className="button button-primary hero-action" to="/buyers/new">+ Add buyer</Link>
+        <Link className="button button-primary hero-action" to="/buyers/new"><Plus size={18} aria-hidden="true" />Add buyer</Link>
       </section>
 
       <section className="finder" aria-labelledby="directory-heading">
@@ -48,6 +49,7 @@ export default function BuyerDirectoryPage() {
 
         <label className="search-field">
           <span className="sr-only">Search by name or phone</span>
+          <Search size={21} aria-hidden="true" />
           <input
             type="search"
             value={query}
@@ -65,7 +67,7 @@ export default function BuyerDirectoryPage() {
 
         {status === 'ready' && buyers.length > 0 && (
           <ul className="buyer-list">
-            {buyers.map((buyer, index) => <BuyerCard buyer={buyer} index={index} key={buyer.id} />)}
+            {buyers.map((buyer) => <BuyerCard buyer={buyer} key={buyer.id} />)}
           </ul>
         )}
       </section>

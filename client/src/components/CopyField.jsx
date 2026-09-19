@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Check, Copy } from 'lucide-react';
 
 export default function CopyField({ label, value }) {
   const [status, setStatus] = useState('');
@@ -25,7 +26,7 @@ export default function CopyField({ label, value }) {
         <span className="field-value">{value}</span>
       </div>
       <div className="copy-action">
-        <button type="button" className="button button-secondary" onClick={copyValue}>Copy</button>
+        <button type="button" className="button button-secondary" onClick={copyValue}>{status === 'Copied' ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}{status === 'Copied' ? 'Copied' : 'Copy'}</button>
         <span className="copy-status" aria-live="polite">{status}</span>
       </div>
     </div>
