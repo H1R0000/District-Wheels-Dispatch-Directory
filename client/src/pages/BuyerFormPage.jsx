@@ -8,15 +8,21 @@ const emptyAddress = () => ({ street: '', barangay: '', city: '', province: '', 
 const emptyPickup = () => ({ branchName: '', branchAddress: '', isDefault: false });
 const emptyBuyer = () => ({ name: '', phone: '', preferredCourier: 'LBC', addresses: [{ ...emptyAddress(), isDefault: true }], pickups: [] });
 
-function buyerFromPickupDraft(draft) {
+function buyerFromAssistantDraft(draft) {
   if (!draft) return emptyBuyer();
+  const courier = draft.preferredCourier === 'J&T Express' ? 'J&T Express' : 'LBC';
+  const method = courier === 'J&T Express' ? 'door' : draft.deliveryMethod === 'door' ? 'door' : 'pickup';
   return {
     name: String(draft.name ?? ''),
     phone: String(draft.phone ?? ''),
-    preferredCourier: 'LBC',
-    addresses: [],
-    pickups: [{ ...emptyPickup(), branchName: String(draft.branchName ?? ''), branchAddress: String(draft.branchAddress ?? ''), isDefault: true }],
+    preferredCourier: courier,
+    addresses: method === 'door' ? [{ ...emptyAddress(), ...Object.fromEntries(Object.keys(emptyAddress()).filter((field) => field !== 'isDefault').map((field) => [field, String(draft.address?.[field] ?? '')])), isDefault: true }] : [],
+    pickups: method === 'pickup' ? [{ ...emptyPickup(), branchName: String(draft.branchName ?? ''), branchAddress: String(draft.branchAddress ?? ''), isDefault: true }] : [],
   };
+}
+
+function draftDeliveryMethod(draft) {
+  return draft && draft.preferredCourier !== 'J&T Express' && draft.deliveryMethod !== 'door' ? 'pickup' : 'door';
 }
 
 const addressFields = [
@@ -88,9 +94,9 @@ export default function BuyerFormPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const isEditing = Boolean(buyerId);
-  const pickupDraft = !isEditing ? location.state?.buyerDraft : null;
-  const [buyer, setBuyer] = useState(() => buyerFromPickupDraft(pickupDraft));
-  const [deliveryMethod, setDeliveryMethod] = useState(pickupDraft ? 'pickup' : 'door');
+  const assistantDraft = !isEditing ? location.state?.buyerDraft : null;
+  const [buyer, setBuyer] = useState(() => buyerFromAssistantDraft(assistantDraft));
+  const [deliveryMethod, setDeliveryMethod] = useState(draftDeliveryMethod(assistantDraft));
   const [status, setStatus] = useState(isEditing ? 'loading' : 'ready');
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
@@ -98,8 +104,8 @@ export default function BuyerFormPage() {
 
   useEffect(() => {
     if (isEditing) return;
-    setBuyer(buyerFromPickupDraft(location.state?.buyerDraft));
-    setDeliveryMethod(location.state?.buyerDraft ? 'pickup' : 'door');
+    setBuyer(buyerFromAssistantDraft(location.state?.buyerDraft));
+    setDeliveryMethod(draftDeliveryMethod(location.state?.buyerDraft));
     setStatus('ready');
     setMessage('');
     setErrors({});
@@ -165,7 +171,7 @@ export default function BuyerFormPage() {
     <div className="page form-page">
       <Link className="back-link" to={isEditing ? `/buyers/${buyerId}` : '/'}><ArrowLeft size={16} aria-hidden="true" />{isEditing ? 'Buyer details' : 'Buyer directory'}</Link>
       <div className="form-title"><h1>{isEditing ? `Update ${buyer.name}` : 'Add a buyer'}</h1><p>Keep contact and delivery details accurate so every parcel is ready for dispatch.</p></div>
-      {pickupDraft && <div className="draft-review" role="status">
+      {assistantDraft && <div className="draft-review" role="status">
         <p>{location.state?.draftNotice || 'Review the details extracted from the buyer’s message before saving.'}</p>
         <div className="draft-review-links">
           {location.state?.draftSourceUrl && <a href={location.state.draftSourceUrl} target="_blank" rel="noopener noreferrer">View LBC listing</a>}
