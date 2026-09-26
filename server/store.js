@@ -13,6 +13,10 @@ function normalizeDefaults(items) {
   return items.map((item, index) => ({ ...item, isDefault: index === defaultIndex }));
 }
 
+function trimLocation(item) {
+  return Object.fromEntries(Object.entries(item).map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value]));
+}
+
 function prepareBuyer(input, existingId) {
   const phone = normalizePhone(input.phone);
   return {
@@ -20,8 +24,8 @@ function prepareBuyer(input, existingId) {
     name: input.name.trim(),
     phone,
     preferredCourier: input.preferredCourier,
-    addresses: normalizeDefaults((input.addresses ?? []).map((item) => ({ ...item, recipientName: input.name.trim(), recipientPhone: phone, id: item.id || `address-${randomUUID()}` }))),
-    pickups: normalizeDefaults((input.pickups ?? []).map((item) => ({ ...item, recipientName: input.name.trim(), recipientPhone: phone, id: item.id || `pickup-${randomUUID()}` }))),
+    addresses: normalizeDefaults((input.addresses ?? []).map((item) => ({ ...trimLocation(item), recipientName: input.name.trim(), recipientPhone: phone, id: item.id || `address-${randomUUID()}` }))),
+    pickups: normalizeDefaults((input.pickups ?? []).map((item) => ({ ...trimLocation(item), recipientName: input.name.trim(), recipientPhone: phone, id: item.id || `pickup-${randomUUID()}` }))),
   };
 }
 

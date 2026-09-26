@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { createApp } from '../server/app.js';
 import { MemoryStore } from '../server/store.js';
+import { buildBuyerPayload } from '../client/src/utils/buyerPayload.js';
 
 let server;
 let baseUrl;
@@ -18,6 +19,18 @@ test('health endpoint reports ok', async () => {
   const response = await fetch(`${baseUrl}/api/health`);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { status: 'ok' });
+});
+
+test('production mode closes the unauthenticated legacy buyer API', async () => {
+  const lockedServer = createApp(new MemoryStore(), { enableLegacyApi: false }).listen(0);
+  await new Promise((resolve) => lockedServer.once('listening', resolve));
+  try {
+    const url = `http://127.0.0.1:${lockedServer.address().port}/api/buyers`;
+    assert.equal((await fetch(url)).status, 404);
+    assert.equal((await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 404);
+  } finally {
+    lockedServer.close();
+  }
 });
 
 test('buyer search matches names and phone numbers', async () => {
@@ -38,7 +51,7 @@ test('invalid buyer payload returns field errors', async () => {
   const response = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   assert.equal(response.status, 400);
   const result = await response.json();
-  assert.equal(result.errors.name, 'This field is required.');
+  assert.equal(result.errors.name, 'Enter the buyer’s full name.');
   assert.equal(result.errors.preferredCourier, 'Choose a supported courier.');
 });
 
@@ -48,8 +61,23 @@ test('J&T requires a complete address', async () => {
   assert.equal((await response.json()).errors.addresses, 'Add a complete J&T delivery address.');
 });
 
+test('switching a buyer to J&T preserves complete LBC pickup details', () => {
+  const buyer = {
+    name: 'Multi-courier Buyer',
+    phone: '0917 111 2222',
+    preferredCourier: 'J&T Express',
+    addresses: [{ street: '1 Test Road', barangay: 'Test', city: 'Manila', province: 'Metro Manila', zipCode: '1000', isDefault: true }],
+    pickups: [{ branchName: 'LBC Test Branch', branchAddress: '2 Branch Road, Manila', isDefault: true }],
+  };
+
+  const payload = buildBuyerPayload(buyer, 'door');
+
+  assert.equal(payload.addresses.length, 1);
+  assert.deepEqual(payload.pickups, buyer.pickups);
+});
+
 test('LBC branch pickup reuses the buyer name and phone', async () => {
-  const payload = { name: 'Pickup Buyer', phone: '(0917) 180 3828', preferredCourier: 'LBC', addresses: [], pickups: [{ branchName: 'LBC Test Branch', branchAddress: '1 Branch Road, Manila', isDefault: true }] };
+  const payload = { name: 'Pickup Buyer', phone: '(0917) 180 3828', preferredCourier: 'LBC', addresses: [], pickups: [{ branchName: '  LBC Test Branch  ', branchAddress: '  1 Branch Road, Manila  ', isDefault: true }] };
   const createResponse = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   assert.equal(createResponse.status, 201);
   const created = await createResponse.json();
@@ -57,6 +85,8 @@ test('LBC branch pickup reuses the buyer name and phone', async () => {
   assert.equal(created.pickups[0].recipientName, 'Pickup Buyer');
   assert.equal(created.phone, '09171803828');
   assert.equal(created.pickups[0].recipientPhone, '09171803828');
+  assert.equal(created.pickups[0].branchName, 'LBC Test Branch');
+  assert.equal(created.pickups[0].branchAddress, '1 Branch Road, Manila');
   await fetch(`${baseUrl}/api/buyers/${created.id}`, { method: 'DELETE' });
 });
 

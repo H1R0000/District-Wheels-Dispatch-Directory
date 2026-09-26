@@ -4,13 +4,14 @@ import { resolve } from 'node:path';
 import { MemoryStore } from './store.js';
 import { normalizePhone } from './phone.js';
 
-const textFields = ['name', 'phone'];
 const addressFields = ['street', 'barangay', 'city', 'province', 'zipCode'];
 const pickupFields = ['branchName', 'branchAddress'];
+const fieldLabels = { street: 'street or building', barangay: 'barangay', city: 'city or municipality', province: 'province', zipCode: 'ZIP code', branchName: 'LBC branch name', branchAddress: 'complete branch address' };
 
 function validateBuyer(body) {
   const errors = {};
-  for (const field of textFields) if (!String(body[field] ?? '').trim()) errors[field] = 'This field is required.';
+  if (!String(body.name ?? '').trim()) errors.name = 'Enter the buyer’s full name.';
+  if (!String(body.phone ?? '').trim()) errors.phone = 'Enter the buyer’s phone number.';
   if (String(body.phone ?? '').trim() && !normalizePhone(body.phone)) errors.phone = 'Enter a valid phone number.';
   if (!['LBC', 'J&T Express'].includes(body.preferredCourier)) errors.preferredCourier = 'Choose a supported courier.';
   const hasAddress = Array.isArray(body.addresses) && body.addresses.length > 0;
@@ -18,10 +19,10 @@ function validateBuyer(body) {
   if (body.preferredCourier === 'J&T Express' && !hasAddress) errors.addresses = 'Add a complete J&T delivery address.';
   if (body.preferredCourier === 'LBC' && !hasAddress && !hasPickup) errors.locations = 'Choose LBC door to door or branch pickup and add its details.';
   (body.addresses ?? []).forEach((address, index) => {
-    for (const field of addressFields) if (!String(address[field] ?? '').trim()) errors[`addresses.${index}.${field}`] = 'Required';
+    for (const field of addressFields) if (!String(address[field] ?? '').trim()) errors[`addresses.${index}.${field}`] = `Enter the ${fieldLabels[field]}.`;
   });
   (body.pickups ?? []).forEach((pickup, index) => {
-    for (const field of pickupFields) if (!String(pickup[field] ?? '').trim()) errors[`pickups.${index}.${field}`] = 'Required';
+    for (const field of pickupFields) if (!String(pickup[field] ?? '').trim()) errors[`pickups.${index}.${field}`] = `Enter the ${fieldLabels[field]}.`;
   });
   return errors;
 }
@@ -32,6 +33,12 @@ export function createApp(store = new MemoryStore(), options = {}) {
   app.use(express.json({ limit: '100kb' }));
 
   app.get('/api/health', (_request, response) => response.json({ status: 'ok' }));
+
+  // The legacy API has no Supabase user context. Keep it for explicit local
+  // development/tests only; production clients use Supabase with RLS.
+  if (options.enableLegacyApi === false) {
+    app.use('/api/buyers', (_request, response) => response.status(404).json({ message: 'Not found' }));
+  }
 
   app.get('/api/buyers', async (request, response, next) => {
     try { response.json(await store.list(String(request.query.q ?? ''))); } catch (error) { next(error); }

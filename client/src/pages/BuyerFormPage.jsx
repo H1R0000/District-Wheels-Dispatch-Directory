@@ -1,10 +1,23 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react';
+import { buildBuyerPayload } from '../utils/buyerPayload.js';
+import { getBuyer, saveBuyer } from '../lib/buyers.js';
 
 const emptyAddress = () => ({ street: '', barangay: '', city: '', province: '', zipCode: '', isDefault: false });
 const emptyPickup = () => ({ branchName: '', branchAddress: '', isDefault: false });
 const emptyBuyer = () => ({ name: '', phone: '', preferredCourier: 'LBC', addresses: [{ ...emptyAddress(), isDefault: true }], pickups: [] });
+
+function buyerFromPickupDraft(draft) {
+  if (!draft) return emptyBuyer();
+  return {
+    name: String(draft.name ?? ''),
+    phone: String(draft.phone ?? ''),
+    preferredCourier: 'LBC',
+    addresses: [],
+    pickups: [{ ...emptyPickup(), branchName: String(draft.branchName ?? ''), branchAddress: String(draft.branchAddress ?? ''), isDefault: true }],
+  };
+}
 
 const addressFields = [
   ['street', 'Street / building'], ['barangay', 'Barangay'], ['city', 'City / municipality'],
@@ -14,8 +27,16 @@ const pickupFields = [
   ['branchName', 'LBC branch name'], ['branchAddress', 'Complete branch address'],
 ];
 
-function LocationEditor({ title, description, type, items, setItems, fields, createItem, required }) {
+const addressAutocomplete = { street: 'street-address', barangay: 'address-level3', city: 'address-level2', province: 'address-level1', zipCode: 'postal-code' };
+
+function FieldError({ id, children }) {
+  if (!children) return null;
+  return <span className="field-error" id={id}>{children}</span>;
+}
+
+function LocationEditor({ title, description, type, items, setItems, fields, createItem, required, errors }) {
   const singular = type === 'addresses' ? 'address' : 'pickup location';
+  const addLabel = type === 'addresses' ? 'Add address' : 'Add pickup location';
   function update(index, field, value) {
     setItems(items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
   }
@@ -34,8 +55,9 @@ function LocationEditor({ title, description, type, items, setItems, fields, cre
     <section className="panel form-section">
       <div className="section-heading">
         <div><h2>{title}</h2><p>{description}</p></div>
-        <button type="button" className="button button-secondary" onClick={() => setItems([...items, { ...createItem(), isDefault: items.length === 0 }])}><Plus size={17} aria-hidden="true" />Add</button>
+        <button type="button" className="button button-secondary" onClick={() => setItems([...items, { ...createItem(), isDefault: items.length === 0 }])}><Plus size={17} aria-hidden="true" />{addLabel}</button>
       </div>
+      <FieldError id={`${type}-error`}>{errors[type] ?? errors.locations}</FieldError>
       {items.length === 0 && <p className="state-message">No {type === 'addresses' ? 'addresses' : 'pickup locations'} added.</p>}
       <div className="location-list">
         {items.map((item, index) => (
@@ -45,12 +67,13 @@ function LocationEditor({ title, description, type, items, setItems, fields, cre
               {fields.map(([field, label]) => (
                 <label className={field === 'branchAddress' || field === 'street' ? 'wide-field' : ''} key={field}>
                   <span>{label}</span>
-                  <input required value={item[field]} onChange={(event) => update(index, field, event.target.value)} />
+                  <input required name={`${type}.${index}.${field}`} autoComplete={type === 'addresses' ? addressAutocomplete[field] : 'off'} maxLength={field === 'zipCode' ? 10 : 160} value={item[field]} onChange={(event) => update(index, field, event.target.value)} aria-invalid={Boolean(errors[`${type}.${index}.${field}`])} aria-describedby={errors[`${type}.${index}.${field}`] ? `${type}-${index}-${field}-error` : undefined} />
+                  <FieldError id={`${type}-${index}-${field}-error`}>{errors[`${type}.${index}.${field}`]}</FieldError>
                 </label>
               ))}
             </div>
             <div className="location-actions">
-              <label className="radio-label"><input type="radio" name={`default-${type}`} checked={item.isDefault} onChange={() => makeDefault(index)} /> Default {singular}</label>
+              {items.length > 1 ? <label className="radio-label"><input type="radio" name={`default-${type}`} checked={item.isDefault} onChange={() => makeDefault(index)} /> Default {singular}</label> : <span className="primary-location">Primary {singular}</span>}
               <button type="button" className="text-button danger-text" onClick={() => remove(index)} disabled={required && items.length === 1}><Trash2 size={15} aria-hidden="true" />Remove</button>
             </div>
           </fieldset>
@@ -62,22 +85,33 @@ function LocationEditor({ title, description, type, items, setItems, fields, cre
 
 export default function BuyerFormPage() {
   const { buyerId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const isEditing = Boolean(buyerId);
-  const [buyer, setBuyer] = useState(emptyBuyer);
-  const [deliveryMethod, setDeliveryMethod] = useState('door');
+  const pickupDraft = !isEditing ? location.state?.buyerDraft : null;
+  const [buyer, setBuyer] = useState(() => buyerFromPickupDraft(pickupDraft));
+  const [deliveryMethod, setDeliveryMethod] = useState(pickupDraft ? 'pickup' : 'door');
   const [status, setStatus] = useState(isEditing ? 'loading' : 'ready');
   const [message, setMessage] = useState('');
+  const [errors, setErrors] = useState({});
+  const formRef = useRef(null);
+
+  useEffect(() => {
+    if (isEditing) return;
+    setBuyer(buyerFromPickupDraft(location.state?.buyerDraft));
+    setDeliveryMethod(location.state?.buyerDraft ? 'pickup' : 'door');
+    setStatus('ready');
+    setMessage('');
+    setErrors({});
+  }, [isEditing, location.key]);
 
   useEffect(() => {
     if (!isEditing) return undefined;
     const controller = new AbortController();
-    fetch(`/api/buyers/${buyerId}`, { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error('Buyer could not be loaded.');
-        return response.json();
-      })
+    getBuyer(buyerId)
       .then((data) => {
+        if (!data) throw new Error('Buyer could not be loaded.');
+        if (controller.signal.aborted) return;
         setBuyer(data);
         setDeliveryMethod(data.preferredCourier === 'LBC' && data.addresses.length === 0 && data.pickups.length > 0 ? 'pickup' : 'door');
         setStatus('ready');
@@ -88,26 +122,41 @@ export default function BuyerFormPage() {
 
   async function submit(event) {
     event.preventDefault();
-    setStatus('saving');
     setMessage('');
-    try {
-      const payload = {
-        ...buyer,
-        addresses: deliveryMethod === 'door' ? buyer.addresses : [],
-        pickups: buyer.preferredCourier === 'LBC' && deliveryMethod === 'pickup' ? buyer.pickups : [],
-      };
-      const response = await fetch(isEditing ? `/api/buyers/${buyerId}` : '/api/buyers', {
-        method: isEditing ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+    const nextErrors = {};
+    if (!buyer.name.trim()) nextErrors.name = 'Enter the buyer’s name.';
+    if (!/^\d{7,15}$/.test(buyer.phone.replace(/\D/g, ''))) nextErrors.phone = 'Enter a valid phone number.';
+    const locationType = deliveryMethod === 'pickup' ? 'pickups' : 'addresses';
+    const fields = deliveryMethod === 'pickup' ? pickupFields : addressFields;
+    if (!buyer[locationType].length) nextErrors.locations = 'Add a delivery location.';
+    buyer[locationType].forEach((item, index) => {
+      fields.forEach(([field, label]) => {
+        if (!String(item[field] ?? '').trim()) nextErrors[`${locationType}.${index}.${field}`] = `Enter ${label.toLowerCase()}.`;
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message ?? 'The buyer could not be saved.');
-      navigate(`/buyers/${result.id}`, { replace: true });
+    });
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
+      setMessage('Complete the highlighted details before saving.');
+      window.requestAnimationFrame(() => formRef.current?.querySelector('[aria-invalid="true"]')?.focus());
+      return;
+    }
+    setErrors({});
+    setStatus('saving');
+    try {
+      const payload = buildBuyerPayload(buyer, deliveryMethod);
+      const result = await saveBuyer(payload, isEditing ? buyerId : undefined);
+      navigate(`/buyers/${result.id}`, { replace: true, state: { saved: true } });
     } catch (error) {
       setMessage(error.message);
       setStatus('error');
+      window.requestAnimationFrame(() => formRef.current?.querySelector('[aria-invalid="true"]')?.focus());
     }
+  }
+
+  function changeCourier(preferredCourier) {
+    setErrors({});
+    setBuyer({ ...buyer, preferredCourier, addresses: buyer.addresses.length ? buyer.addresses : [{ ...emptyAddress(), isDefault: true }] });
+    if (preferredCourier === 'J&T Express') setDeliveryMethod('door');
   }
 
   if (status === 'loading') return <div className="page"><p className="state-message">Loading buyer form…</p></div>;
@@ -115,14 +164,22 @@ export default function BuyerFormPage() {
   return (
     <div className="page form-page">
       <Link className="back-link" to={isEditing ? `/buyers/${buyerId}` : '/'}><ArrowLeft size={16} aria-hidden="true" />{isEditing ? 'Buyer details' : 'Buyer directory'}</Link>
-      <div className="form-title"><h1>{isEditing ? `Update ${buyer.name}` : 'Add a buyer'}</h1><p>Use fictional information for development and demonstrations.</p></div>
-      <form onSubmit={submit}>
+      <div className="form-title"><h1>{isEditing ? `Update ${buyer.name}` : 'Add a buyer'}</h1><p>Keep contact and delivery details accurate so every parcel is ready for dispatch.</p></div>
+      {pickupDraft && <div className="draft-review" role="status">
+        <p>{location.state?.draftNotice || 'Review the details extracted from the buyer’s message before saving.'}</p>
+        <div className="draft-review-links">
+          {location.state?.draftSourceUrl && <a href={location.state.draftSourceUrl} target="_blank" rel="noopener noreferrer">View LBC listing</a>}
+          {location.state?.draftGoogleSearchUrl && <a href={location.state.draftGoogleSearchUrl} target="_blank" rel="noopener noreferrer">Check branch on Google</a>}
+        </div>
+        <small>Google search includes branch details only, not the buyer’s name or phone.</small>
+      </div>}
+      <form ref={formRef} onSubmit={submit} noValidate>
         <section className="panel form-section">
           <div className="section-heading"><div><h2>Buyer information</h2><p>Contact and courier preference.</p></div></div>
           <div className="form-grid">
-            <label><span>Full name</span><input required value={buyer.name} onChange={(event) => setBuyer({ ...buyer, name: event.target.value })} /></label>
-            <label><span>Phone number</span><input required inputMode="tel" value={buyer.phone} onChange={(event) => setBuyer({ ...buyer, phone: event.target.value })} /></label>
-            <label><span>Preferred courier</span><select value={buyer.preferredCourier} onChange={(event) => { const preferredCourier = event.target.value; setBuyer({ ...buyer, preferredCourier, addresses: buyer.addresses.length ? buyer.addresses : [{ ...emptyAddress(), isDefault: true }] }); if (preferredCourier === 'J&T Express') setDeliveryMethod('door'); }}><option value="LBC">LBC</option><option value="J&T Express">J&amp;T Express</option></select></label>
+            <label><span>Full name</span><input required name="name" autoComplete="name" maxLength="120" value={buyer.name} onChange={(event) => setBuyer({ ...buyer, name: event.target.value })} aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'name-error' : undefined} /><FieldError id="name-error">{errors.name}</FieldError></label>
+            <label><span>Phone number</span><input required name="phone" type="tel" inputMode="tel" autoComplete="tel" maxLength="32" placeholder="Example: 0917 123 4567" value={buyer.phone} onChange={(event) => setBuyer({ ...buyer, phone: event.target.value })} aria-invalid={Boolean(errors.phone)} aria-describedby={errors.phone ? 'phone-hint phone-error' : 'phone-hint'} /><small className="field-hint" id="phone-hint">Spaces and punctuation are removed when saved.</small><FieldError id="phone-error">{errors.phone}</FieldError></label>
+            <label><span>Preferred courier</span><select name="preferredCourier" value={buyer.preferredCourier} onChange={(event) => changeCourier(event.target.value)} aria-invalid={Boolean(errors.preferredCourier)} aria-describedby={errors.preferredCourier ? 'courier-error' : undefined}><option value="LBC">LBC</option><option value="J&T Express">J&amp;T Express</option></select><FieldError id="courier-error">{errors.preferredCourier}</FieldError></label>
           </div>
         </section>
 
@@ -137,9 +194,9 @@ export default function BuyerFormPage() {
         )}
 
         {deliveryMethod === 'door' ? (
-          <LocationEditor title={buyer.preferredCourier === 'J&T Express' ? 'J&T delivery address' : 'LBC door-to-door address'} description="Name and phone will be taken from the buyer information above." type="addresses" items={buyer.addresses} setItems={(addresses) => setBuyer({ ...buyer, addresses })} fields={addressFields} createItem={emptyAddress} required />
+          <LocationEditor title={buyer.preferredCourier === 'J&T Express' ? 'J&T delivery address' : 'LBC door-to-door address'} description="Name and phone will be taken from the buyer information above." type="addresses" items={buyer.addresses} setItems={(addresses) => setBuyer({ ...buyer, addresses })} fields={addressFields} createItem={emptyAddress} required errors={errors} />
         ) : (
-          <LocationEditor title="LBC branch pickup" description="Choose the branch where this buyer will collect the parcel. Name and phone come from above." type="pickups" items={buyer.pickups} setItems={(pickups) => setBuyer({ ...buyer, pickups })} fields={pickupFields} createItem={emptyPickup} required />
+          <LocationEditor title="LBC branch pickup" description="Choose the branch where this buyer will collect the parcel. Name and phone come from above." type="pickups" items={buyer.pickups} setItems={(pickups) => setBuyer({ ...buyer, pickups })} fields={pickupFields} createItem={emptyPickup} required errors={errors} />
         )}
 
         {message && <p className="form-error" role="alert">{message}</p>}

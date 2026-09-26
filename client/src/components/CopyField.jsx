@@ -27,7 +27,7 @@ export default function CopyField({ label, value, clipboardValue = value }) {
       </div>
       <div className="copy-action">
         <button type="button" className="button button-secondary" onClick={handleCopy}>{status === 'Copied' ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}{status === 'Copied' ? 'Copied' : 'Copy'}</button>
-        <span className="copy-status" aria-live="polite">{status}</span>
+        <span className="sr-only" aria-live="polite">{status}</span>
       </div>
     </div>
   );
