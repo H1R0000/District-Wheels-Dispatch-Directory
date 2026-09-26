@@ -107,6 +107,8 @@ On September 26, 2026, all 38 local tests and the production build passed. The b
 
 ## 6. Deploy to Vercel
 
+**Live deployment (September 26, 2026):** [District Wheels Dispatch Directory](https://district-wheels-dispatch-directory.vercel.app) from commit `d8398cb` (deployment `dpl_8jhmSG6QwSwg1hzXasTwvTDK7Mdg`). The production site passed a fresh mobile demo sign-in, direct `/buyers/new` refresh, and demo buyer create, edit, and delete. The test record was removed. The production origin is configured in Supabase Auth and the three Edge Functions. Automatic GitHub deployments need the Vercel account's GitHub login connection; the CLI deployment is live and repeatable meanwhile.
+
 The root [`vercel.json`](vercel.json) builds the Vite app with `npm run build`, serves `client/dist`, and rewrites direct React route requests to `index.html`. The optional Express server is not part of the Vercel deployment.
 
 1. Create a Vercel project from this GitHub repository with the repository root as its root directory.
