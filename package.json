@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently -n api,web -c yellow,cyan \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "node --watch server/index.js",
-    "dev:client": "vite --config client/vite.config.js",
+    "dev:client": "vite --config client/vite.config.js --configLoader runner",
     "start": "node server/index.js",
     "build": "vite build --config client/vite.config.js --configLoader runner",
     "test": "node --test test/api.test.js test/phone.test.js test/lbc-resolver.test.js test/buyer-search.test.js"

@@ -2,128 +2,133 @@
 
 ## 1. Overview
 
-District Wheels Dispatch Directory is a planned fulfillment tool for the District Wheels fulfillment manager. It will help the manager find a repeat buyer and copy saved shipping information into LBC or J&T Express forms with fewer repeated lookups and typing errors.
+District Wheels Dispatch Directory helps a fulfillment manager find repeat buyers and copy saved shipping details into LBC or J&T Express forms. The Week 1 proposal and wireframes have since become a React application with buyer records, courier-specific locations, authentication, and a fictional-data demo.
 
-The project is currently in the planning and documentation stage. Coding has not started yet. The Week 1 work covers the four planned screens, component architecture, primary task flow, responsive behavior, and design system before the React, Express, and PostgreSQL implementation begins.
+The browser app uses Supabase Auth, Database, and Edge Functions. An Express API and JSON or PostgreSQL store remain in the repository for explicit local development and tests; the browser's buyer operations use Supabase directly.
 
 ## 2. Setup and installation
 
 ### Prerequisites
 
-No application setup or dependency installation is required. The repository currently contains documentation only. Git is optional and is needed only if you want a local copy.
+- Node.js and npm compatible with the versions in `package-lock.json`.
+- Access to a configured Supabase project for the browser app. The project must have the migrations, approved user profiles, Auth settings, and Edge Functions described in [demo and owner rollout](docs/demo-owner-rollout.md).
+- PostgreSQL only if using the optional Express API with `DATABASE_URL`. Without it, the server uses an ignored local JSON file.
 
-### Get the code
+### Get the code and install dependencies
 
-1. Clone the public GitHub repository:
-
-   ```bash
-   git clone https://github.com/H1R0000/District-Wheels-Dispatch-Directory.git
-   ```
-
-2. Enter the project directory:
-
-   ```bash
-   cd DCW_Dispatch_Directory
-   ```
-
-### Install dependencies
-
-There are no dependencies to install. Markdown files can be read directly on GitHub, while the exported PDFs can be opened with a PDF viewer.
-
-### Environment and configuration
-
-The current planning documentation requires no environment variables, secrets, or external services.
-
-Do not add real buyer records or courier credentials to the repository. The finished application will use placeholder values in an `.env.example` file and keep real secrets in an untracked `.env` file.
-
-### Set up and seed the database
-
-There is no database to create, migrate, or seed in the Week 1 increment. The planned PostgreSQL database will be added later and seeded only with fictional buyer and shipping data. This section will be updated with exact migration and seed commands when the database exists.
-
-## 3. How to view it
-
-Open this README on GitHub, then use the links under **Supporting files** to read the proposal, wireframe documentation, increment report, and exported PDFs. No local server is required.
-
-## 4. Features and usage
-
-### Screen map
-
-The screen map documents the intended navigation among:
-
-- Buyer Directory
-- Buyer Details
-- Add Buyer
-- Edit Buyer
-
-It also shows where the user returns after saving or canceling a buyer form.
-
-### Responsive screen wireframes
-
-Open the wireframe documentation or PDF to review the Buyer Directory, Buyer Details, Add Buyer, and Edit Buyer layouts at desktop and phone sizes. Search, save, edit, delete, and copy actions shown in the wireframes are planned features rather than working controls.
-
-### Component architecture
-
-Open the wireframe documentation to review:
-
-- Page-level components for the four screens.
-- Organisms such as `AppHeader` and `LocationDialog`.
-- Molecules such as `SearchBar`, `BuyerCard`, and `CopyField`.
-- Atoms such as buttons, inputs, tags, and feedback text.
-
-The atomic-design table records where each component appears and the props it is expected to receive.
-
-### Task walkthrough
-
-Use the task-flow section of the wireframe documentation to follow the primary fulfillment flow:
-
-1. Search for a repeat buyer.
-2. Open the buyer record.
-3. Choose the shipping method.
-4. Select a saved address or LBC pickup location.
-5. Copy the required values.
-6. Paste them into the external courier form.
-
-### Current endpoints
-
-No API endpoints exist because coding has not started. Planned Express routes will cover buyers, addresses, LBC pickup locations, and couriers after the database is implemented.
-
-## 5. Project structure
-
-```text
-DCW_Dispatch_Directory/
-|-- docs/
-|   |-- pdf/                # Exported wireframe and design-system PDFs
-|   |-- proposal.md         # Project proposal
-|   |-- wireframes.md       # Detailed wireframe documentation
-|   `-- week-1-increment-report.md
-`-- README.md               # Project documentation
+```bash
+git clone https://github.com/H1R0000/District-Wheels-Dispatch-Directory.git
+cd District-Wheels-Dispatch-Directory
+npm ci
 ```
 
-## 6. Known issues and next steps
+### Configure the browser app
 
-### Known issues
+Copy `client/.env.example` to an untracked `client/.env.local` and fill in the Supabase project's public browser values (Vite's root is `client/`):
 
-- Coding has not started; the repository currently contains planning documentation rather than a working application.
-- Buyer records, addresses, pickup locations, and courier choices are placeholders.
-- Search, copy, create, edit, delete, and save controls do not yet perform data operations.
-- The database rule that allows only one default address and one default LBC pickup location per buyer is designed but not implemented or tested.
+```dotenv
+VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
+```
 
-### Next steps
+These values are required: the sign-in screen fails closed when either is missing. Keep service-role keys, demo credentials, and other secrets out of `VITE_` variables and source control. The demo and assistant require their deployed Edge Functions and server-side secrets; `.env` alone does not create a working Supabase project.
 
-- Build the four screens as React routes and reusable components.
-- Create the Node/Express REST API.
-- Add PostgreSQL migrations and fictional seed data.
-- Implement search and buyer CRUD operations.
-- Add address and LBC pickup-location management.
-- Add clipboard actions and text-based success or failure feedback.
-- Add validation, database transactions, and useful loading, empty, and error states.
-- Test responsive layouts, keyboard operation, and accessibility.
-- Document the final environment variables, database commands, and API endpoints when those features are implemented.
+### Run locally
+
+```bash
+npm run dev:client
+```
+
+Open `http://localhost:5173`. Use **Sign in with GitHub** for the approved owner account or **Enter demo** for fictional records when the configured backend supports those flows.
+
+`npm run dev` starts both Vite and Express. Express listens on port `3000` by default, but its legacy buyer endpoints are disabled unless `ENABLE_LEGACY_API=true` is set explicitly. Set `DATABASE_URL` to use PostgreSQL; otherwise the optional API stores data in `data/dev-db.json`. Do not put real buyer data in this local development store.
+
+### Database setup
+
+The browser app depends on the SQL files in `supabase/migrations/`, applied in order to a project with the required Auth configuration. These migrations include buyer and location tables, row-level access policies, demo access, assistant lookups, backup and deletion functions, and atomic buyer save/delete RPCs. The existing hosted project has older migration-history timestamps for some files, so inspect its history before running `supabase db push`; do not blindly replay the files against that project. The repository does not contain a one-command seed for a fresh Supabase project; demo setup requires the administrator steps in [demo and owner rollout](docs/demo-owner-rollout.md).
+
+The optional Express/PostgreSQL path initializes `db/migrations/001_initial.sql` when `DATABASE_URL` is set. It is separate from the Supabase schema.
+
+## 3. Features and usage
+
+### Main workflow
+
+1. Search the Buyer Directory by name or phone number.
+2. Open a buyer record and review the preferred courier, saved delivery addresses, or LBC pickup locations.
+3. Copy the needed fields and paste them into the courier's external form.
+4. Use Add Buyer or Edit Buyer to maintain records. The form validates courier-specific location details.
+
+The four browser routes are `/`, `/buyers/new`, `/buyers/:buyerId`, and `/buyers/:buyerId/edit`. The interface includes a dispatch assistant that can prepare a buyer draft for review and help resolve LBC branch details. Review suggested details before saving them. Buyer saves and deletes run in single database transactions, including their audit records.
+
+The demo uses fictional records and is isolated from the owner's records. It can be reset where the deployed demo functions are available. Access is controlled by approved Supabase profiles and database policies, not just by the sign-in screen.
+
+### Demo screenshots
+
+![Desktop buyer directory in demo mode](docs/screenshots/directory-desktop.png)
+
+![Phone buyer directory in demo mode](docs/screenshots/directory-mobile.png)
+
+### Optional Express endpoints
+
+When `ENABLE_LEGACY_API=true`, the local API provides:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/health` | Health check; available without enabling buyer endpoints. |
+| `GET` | `/api/buyers?q=...` | Search buyers. |
+| `GET` | `/api/buyers/:buyerId` | Read one buyer. |
+| `POST` | `/api/buyers` | Create a buyer. |
+| `PUT` | `/api/buyers/:buyerId` | Replace a buyer's details. |
+| `DELETE` | `/api/buyers/:buyerId` | Delete a buyer. |
+
+The legacy buyer API has no Supabase user context. Keep it disabled for public or production access.
+
+## 4. Project structure
+
+```text
+client/                  React pages, components, styles, and Vite config
+server/                  Optional Express API and JSON/PostgreSQL stores
+db/migrations/           Optional Express/PostgreSQL schema
+supabase/migrations/     Browser app database schema and access policies
+supabase/functions/      Demo, reset, and dispatch assistant functions
+test/                    API and utility tests
+docs/                    Proposal, wireframes, PDFs, and rollout notes
+images/                  District Wheels assets
+```
+
+## 5. Tests and build
+
+```bash
+npm test
+npm run build
+```
+
+On September 26, 2026, all 38 local tests and the production build passed. The build script uses Vite's runner config loader to work in the restricted Windows workspace.
+
+## 6. Deploy to Vercel
+
+The root [`vercel.json`](vercel.json) builds the Vite app with `npm run build`, serves `client/dist`, and rewrites direct React route requests to `index.html`. The optional Express server is not part of the Vercel deployment.
+
+1. Create a Vercel project from this GitHub repository with the repository root as its root directory.
+2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in the Vercel project for Preview and Production. They are browser values. Never add a service-role key, demo password, or assistant API secret to a `VITE_` variable.
+3. Deploy Preview. Add its exact origin to the Supabase Edge Function `APP_ORIGINS` secret if the demo or assistant will be tested there. Add the Preview callback URL to Supabase Auth redirect URLs when testing GitHub sign-in.
+4. After preview checks pass, deploy Production. Set the Supabase Auth Site URL and an exact allowed redirect URL for the production origin; add that origin to `APP_ORIGINS`. Redeploy affected Edge Functions after changing their secret when required by the platform.
+5. Test a fresh browser session, a direct refresh of `/buyers/new` and a buyer detail route, GitHub sign-in, the demo, and the dispatch workflow.
+
+See the [finish and deploy plan](docs/finish-and-vercel-plan.md) for the release checks and [demo and owner rollout](docs/demo-owner-rollout.md) for Supabase setup.
+
+## 7. Known limits
+
+- The assistant and demo require deployed Supabase Edge Functions and configured secrets. A local build alone cannot verify them.
+- Demo records are shared by visitors and may be reset. Do not enter real buyer information in demo mode.
+- The optional Express buyer API has no browser user context and stays disabled unless explicitly enabled for local development.
 
 ## Supporting files
 
 - [Project proposal](docs/proposal.md)
 - [Week 1 increment report](docs/week-1-increment-report.md)
+- [Week 2 increment report](REPORT_2.md)
 - [Wireframe documentation](docs/wireframes.md)
 - [Wireframe PDF](docs/pdf/District-Wheels-Wireframes.pdf)
 - [Design-system PDF](docs/pdf/District-Wheels-Design-System.pdf)
+- [Demo and owner rollout](docs/demo-owner-rollout.md)

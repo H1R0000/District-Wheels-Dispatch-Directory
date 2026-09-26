@@ -1,74 +1,34 @@
-# 1. App Proposal
+# Final project proposal: District Wheels Dispatch Directory
 
-## App name
+This is a working plan. I will update it as the app and its requirements become clearer.
 
-**District Wheels Dispatch Directory**
+## The idea
 
-## What the app is for, in one sentence
+Build a private directory for the District Wheels fulfillment manager to find repeat buyers and copy their saved delivery or LBC branch pickup details into LBC and J&T Express shipping forms.
 
-District Wheels Dispatch Directory helps the fulfillment manager quickly find a repeat buyer and copy the buyer's saved shipping information into the LBC or J&T Express website or mobile app.
+## Why
 
-## Who is it for
+Preparing repeat shipments means looking up and retyping the same contact and location details. A searchable directory with copyable fields should make dispatch faster and reduce mistakes. This project also lets me practice building a responsive React interface, storing related records, and protecting buyer information.
 
-The app is for the District Wheels fulfillment manager who prepares shipments for repeat buyers. When the manager opens it, they need to search for a buyer by name or phone number, open the correct record, choose the appropriate address or LBC pickup location, and copy each required shipping value into an external courier form.
+## Scope
 
-## Sections or routes this app needs
+The first version will let a signed-in manager search buyers by name or phone number; view, add, edit, and delete buyer records; save multiple delivery addresses and LBC pickup locations; choose a default location; and copy individual shipping fields or grouped details. It will support LBC and J&T Express, with clear form validation and loading, empty, success, and error states. Development and demonstrations will use fictional buyer data.
 
-| # | Section / route | What it is for |
-| - | --- | --- |
-| 1 | Buyer Directory | Serves as the entry screen where the manager can search by partial buyer name or phone number and open the correct buyer record. |
-| 2 | Buyer Details | Displays the buyer's contact information, preferred courier, saved addresses, and LBC pickup locations with an individual Copy button beside every value. |
-| 3 | Add Buyer | Lets the manager create a buyer and enter the buyer's basic information plus an initial normal address or LBC branch pickup location. |
-| 4 | Edit Buyer | Lets the manager update the buyer's name, phone number, preferred courier, addresses, and saved LBC pickup locations. |
+The first version will not book shipments, calculate courier rates, track parcels, send messages to buyers, or automatically fill the courier websites. The manager will review and paste the details into the courier form.
 
-Add and edit forms for addresses and LBC pickup locations can appear as focused dialogs or sections within the buyer form instead of becoming extra top-level routes. This keeps the app within four main screens and makes the workflow faster.
+## Milestones
 
-## State: what data does the app hold?
+- [x] Define the fulfillment workflow, four screens, responsive wireframes, and visual design system.
+- [x] Build the initial React screens, buyer forms, copy controls, and buyer data model.
+- [x] Add an Express API and a Supabase schema with sign-in access and buyer-level data rules.
+- [x] Finish and verify the connected create, edit, and delete workflows with fictional demo records.
+- [x] Verify database privacy rules and phone layouts; keep the owner records separate from the demo.
+- [ ] Complete final keyboard, copy, and assistant checks on the deployed preview.
+- [ ] Deploy to Vercel and record the final demonstration link.
 
-The most important screen is **Buyer Details**.
+## Open questions
 
-| Data | Shape (rough) | Who owns it (which component) | Changes when... |
-| --- | --- | --- | --- |
-| Buyer | `{ buyerId, name, phoneNumber, preferredCourier }` | `BuyerDetailsPage` | the page loads a buyer or the buyer's basic information is updated |
-| Addresses | `[{ addressId, recipientName, recipientPhone, street, barangay, city, province, zipCode, isDefault }]` | `BuyerDetailsPage` | an address is added, edited, deleted, or made the default |
-| LBC pickup locations | `[{ pickupId, recipientName, recipientPhone, branchName, branchAddress, isDefault }]` | `BuyerDetailsPage` | a pickup location is added, edited, deleted, or made the default |
-| Shipping method | `"door-to-door" \| "branch-pickup"` | `ShippingDetails` | the manager switches between LBC Door to Door and Branch Pickup |
-| Selected address | `addressId` or `null` | `ShippingDetails` | the manager chooses one of the buyer's saved addresses |
-| Selected pickup | `pickupId` or `null` | `ShippingDetails` | the manager chooses one of the buyer's saved LBC pickup locations |
-| Copy feedback | `fieldName` or `null` | `CopyField` | a copy succeeds, fails, or the short feedback message disappears |
-| Loading and error state | `{ loading, error }` | `BuyerDetailsPage` | an API request begins, succeeds, or fails |
-
-The buyer, addresses, and LBC pickup locations will ultimately come from the Express REST API and PostgreSQL database rather than being kept only in React.
-
-## What each screen contains
-
-- Screen: **Buyer Details**
-  - District Wheels header and a link back to the Buyer Directory
-  - Buyer name and actions for editing or deleting the buyer
-  - Contact section with separate copyable fields for the buyer's name and phone number
-  - Preferred courier section showing LBC or J&T Express
-  - Shipping-method control that shows Door to Door for a normal address and, when the courier is LBC, also allows Branch Pickup
-  - Saved-address selector with the default address clearly marked
-  - Door-to-door shipping fields for recipient name, recipient phone, street, barangay, city, province, and ZIP code
-  - Saved LBC pickup selector with the default pickup location clearly marked
-  - Branch-pickup fields for recipient name, recipient phone, LBC branch name, and LBC branch address
-  - An individual Copy button beside every value that may be pasted into a courier form
-  - Convenience actions for **Copy Full Address** and **Copy All Shipping Details**
-  - Subtle text feedback such as **Copied** that does not rely only on color or use repeated alert popups
-  - Useful loading, error, and empty states when records cannot be loaded or no address or pickup location has been saved
-
-## Content you need to gather
-
-- Approximately ten fictional sample buyers with names, phone numbers, preferred couriers, normal addresses, and LBC branch pickup details
-- The initial courier records: LBC and J&T Express
-- Accurate examples of the shipping fields required by the LBC and J&T Express forms
-- A list of LBC branch names and branch addresses needed for the sample pickup records
-- District Wheels branding, including the correct name, logo if available, colors, and preferred type style
-- Short interface messages for successful copying, failed copying, validation errors, empty search results, unavailable API, and failed saves or deletes
-- Confirmation of the exact format required when using **Copy Full Address** or **Copy All Shipping Details**
-
-Only fictional information will be used for development and demonstration; real customer records will not be included in the project files.
-
-## One risk
-
-The part I am least sure how to build is safely managing multiple saved addresses and LBC pickup locations while allowing only one default of each type per buyer. This affects both React state and PostgreSQL data. I plan to handle a default change through the Express API in a database transaction and use a PostgreSQL unique partial index so two addresses, or two LBC pickup locations, cannot accidentally be marked as the default for the same buyer.
+- Which exact field order and grouped copy format work best for the current LBC and J&T Express forms?
+- The production browser uses Supabase; the Express/PostgreSQL API remains disabled by default for local development and tests.
+- Buyer saves and deletes use database RPCs so the record, locations, and audit entry change in one transaction.
+- Which real LBC branch details should be verified before use outside the fictional demonstration data?
