@@ -3,6 +3,7 @@ import BuyerDetailsPage from './pages/BuyerDetailsPage.jsx';
 import BuyerDirectoryPage from './pages/BuyerDirectoryPage.jsx';
 import BuyerFormPage from './pages/BuyerFormPage.jsx';
 import AppHeader from './components/AppHeader.jsx';
+import DispatchAssistant from './components/DispatchAssistant.jsx';
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="*" element={<div className="page"><h1>Page not found</h1><Link to="/">Return to directory</Link></div>} />
         </Routes>
       </main>
+      <DispatchAssistant />
     </div>
   );
 }
