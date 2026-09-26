@@ -62,11 +62,7 @@ export async function saveBuyer(input, id) {
 }
 
 export async function deleteBuyer(id) {
-  const { data, error: authError } = await supabase.auth.getUser();
-  if (authError || !data.user) throw new Error('Your session expired. Sign in again.');
-  const before = await getBuyer(id);
-  const { error, count } = await supabase.from('buyers').delete({ count: 'exact' }).eq('id', id);
+  const { data, error } = await supabase.rpc('delete_buyer', { target_buyer_id: id });
   if (error) throw error;
-  if (count) await supabase.from('audit_logs').insert({ owner_id: data.user.id, buyer_id: id, action: 'delete', source: 'app', before_data: before });
-  return Boolean(count);
+  return data;
 }
