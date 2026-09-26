@@ -117,7 +117,7 @@ The root [`vercel.json`](vercel.json) builds the Vite app with `npm run build`, 
 4. After preview checks pass, deploy Production. Set the Supabase Auth Site URL and an exact allowed redirect URL for the production origin; add that origin to `APP_ORIGINS`. Redeploy affected Edge Functions after changing their secret when required by the platform.
 5. Test a fresh browser session, a direct refresh of `/buyers/new` and a buyer detail route, GitHub sign-in, the demo, and the dispatch workflow.
 
-See the [finish and deploy plan](docs/finish-and-vercel-plan.md) for the release checks and [demo and owner rollout](docs/demo-owner-rollout.md) for Supabase setup.
+See [demo and owner rollout](docs/demo-owner-rollout.md) for Supabase setup and release checks.
 
 ## 7. Known limits
 
@@ -129,7 +129,7 @@ See the [finish and deploy plan](docs/finish-and-vercel-plan.md) for the release
 
 - [Project proposal](docs/proposal.md)
 - [Week 1 increment report](docs/week-1-increment-report.md)
-- [Week 2 increment report](REPORT_2.md)
+- [Week 2 increment report](docs/REPORT_2.md)
 - [Wireframe documentation](docs/wireframes.md)
 - [Wireframe PDF](docs/pdf/District-Wheels-Wireframes.pdf)
 - [Design-system PDF](docs/pdf/District-Wheels-Design-System.pdf)
