@@ -4,7 +4,7 @@ Status checked: 2026-09-26
 
 ## Release status
 
-The application is live at [district-wheels-dispatch-directory.vercel.app](https://district-wheels-dispatch-directory.vercel.app), deployment `dpl_8jhmSG6QwSwg1hzXasTwvTDK7Mdg`, commit `d8398cb`. The Vercel build, 38 local tests, mobile demo sign-in, direct form-route refresh, and demo buyer create/edit/delete passed. Supabase Auth and Edge Function origins include the production domain. Release changes were pushed in four separate commits. Vercel's automatic GitHub connection still needs a GitHub login connection on the Vercel account; CLI deployment works.
+The application is live at [district-wheels-dispatch-directory.vercel.app](https://district-wheels-dispatch-directory.vercel.app), deployment `dpl_7AWffWiYn5JzCvPbc4BGH7RJn2ea`, commit `ded43fa`. The Vercel build, 38 local tests, mobile demo sign-in, direct form-route refresh, assistant draft preparation, and demo buyer create/edit/delete passed. Supabase Auth and Edge Function origins include the production domain. Release changes were pushed in separate commits. Vercel's automatic GitHub connection still needs a GitHub login connection on the Vercel account; CLI deployment works.
 
 The checklist below records the original plan and distinguishes completed checks from those that still need an account owner or a separate owner-session review.
 
