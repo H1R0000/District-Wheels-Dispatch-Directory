@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react';
 import { buildBuyerPayload } from '../utils/buyerPayload.js';
 import { getBuyer, saveBuyer } from '../lib/buyers.js';
+import { applyAssistantEdit, editedDeliveryMethod } from '../utils/assistantEdit.js';
 
 const emptyAddress = () => ({ street: '', barangay: '', city: '', province: '', zipCode: '', isDefault: false });
 const emptyPickup = () => ({ branchName: '', branchAddress: '', isDefault: false });
@@ -118,13 +119,14 @@ export default function BuyerFormPage() {
       .then((data) => {
         if (!data) throw new Error('Buyer could not be loaded.');
         if (controller.signal.aborted) return;
-        setBuyer(data);
-        setDeliveryMethod(data.preferredCourier === 'LBC' && data.addresses.length === 0 && data.pickups.length > 0 ? 'pickup' : 'door');
+        const editDraft = location.state?.editDraft;
+        setBuyer(applyAssistantEdit(data, editDraft));
+        setDeliveryMethod(editedDeliveryMethod(data, editDraft));
         setStatus('ready');
       })
       .catch((error) => { if (error.name !== 'AbortError') { setMessage(error.message); setStatus('error'); } });
     return () => controller.abort();
-  }, [buyerId, isEditing]);
+  }, [buyerId, isEditing, location.key]);
 
   async function submit(event) {
     event.preventDefault();
@@ -151,7 +153,8 @@ export default function BuyerFormPage() {
     try {
       const payload = buildBuyerPayload(buyer, deliveryMethod);
       const result = await saveBuyer(payload, isEditing ? buyerId : undefined);
-      navigate(`/buyers/${result.id}`, { replace: true, state: { saved: true } });
+      if (!result) throw new Error('The save could not be verified. Please check the buyer directory before trying again.');
+      navigate(`/buyers/${result.id}`, { replace: true, state: { saved: isEditing ? 'updated' : 'created' } });
     } catch (error) {
       setMessage(error.message);
       setStatus('error');
@@ -171,13 +174,13 @@ export default function BuyerFormPage() {
     <div className="page form-page">
       <Link className="back-link" to={isEditing ? `/buyers/${buyerId}` : '/'}><ArrowLeft size={16} aria-hidden="true" />{isEditing ? 'Buyer details' : 'Buyer directory'}</Link>
       <div className="form-title"><h1>{isEditing ? `Update ${buyer.name}` : 'Add a buyer'}</h1><p>Keep contact and delivery details accurate so every parcel is ready for dispatch.</p></div>
-      {assistantDraft && <div className="draft-review" role="status">
+      {(assistantDraft || location.state?.editDraft) && <div className="draft-review" role="status">
         <p>{location.state?.draftNotice || 'Review the details extracted from the buyer’s message before saving.'}</p>
         <div className="draft-review-links">
-          {location.state?.draftSourceUrl && <a href={location.state.draftSourceUrl} target="_blank" rel="noopener noreferrer">View LBC listing</a>}
+          {location.state?.draftSourceUrl && <a href={location.state.draftSourceUrl} target="_blank" rel="noopener noreferrer">View source</a>}
           {location.state?.draftGoogleSearchUrl && <a href={location.state.draftGoogleSearchUrl} target="_blank" rel="noopener noreferrer">Check branch on Google</a>}
         </div>
-        <small>Google search includes branch details only, not the buyer’s name or phone.</small>
+        {location.state?.draftGoogleSearchUrl && <small>Google search includes branch details only, not the buyer’s name or phone.</small>}
       </div>}
       <form ref={formRef} onSubmit={submit} noValidate>
         <section className="panel form-section">

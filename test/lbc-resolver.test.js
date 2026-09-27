@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { extractLbcClues, parsePickupAddressFollowUp, parsePickupConfirmation, parsePickupMessage, resolveLbcBranch, searchTerms } from '../supabase/functions/dispatch-assistant/lbc-resolver.ts';
+import { confirmedBranchClues, confirmedBranchForBuyerReply, extractLbcClues, parsePickupAddressFollowUp, parsePickupConfirmation, parsePickupMessage, resolveLbcBranch, searchTerms } from '../supabase/functions/dispatch-assistant/lbc-resolver.ts';
+import { googleBranchSearchUrl } from '../supabase/functions/dispatch-assistant/branch-search-link.ts';
 
 const arayat = ['LBC Express - ARAYAT', '39 ARAYAT COR. MALABITO ST., CUBAO, QUEZON CITY'];
 const pampanga = ['LBC Express - ARAYAT PAMPANGA', 'CACUTUD, ARAYAT, PAMPANGA'];
@@ -81,15 +82,43 @@ test('plain LBC pickup messages become reviewable buyer drafts', () => {
     name: 'Sample Buyer One', phone: '09171234567', branchName: 'A. Tuazon', locationHint: 'Marikina, Metro Manila',
   });
   assert.deepEqual(parsePickupMessage('Sample Buyer Two\n09171234568\nImall Canlubang, Calamba City Laguna'), {
-    name: 'Sample Buyer Two', phone: '09171234568', branchName: 'Imall Canlubang', locationHint: 'Calamba City Laguna',
+    name: 'Sample Buyer Two', phone: '09171234568', branchName: 'Imall Canlubang', locationHint: 'Calamba City, Laguna',
   });
   assert.deepEqual(parsePickupMessage('Sample Buyer Three\nLbc puregold hugo perez trece martires city\n09171234569'), {
     name: 'Sample Buyer Three', phone: '09171234569', branchName: 'puregold hugo perez trece martires city', locationHint: '',
   });
 });
 
+test('multiline LBC pickup keeps buyer identity out of branch search', () => {
+  const message = 'add buyer\nlbc branch pickup\nRiz Lawrence Quejada\n09568142493\nImall Canlubang, Calamba City Laguna';
+  const expected = { name: 'Riz Lawrence Quejada', phone: '09568142493', branchName: 'Imall Canlubang', locationHint: 'Calamba City, Laguna' };
+  assert.deepEqual(parsePickupMessage(message), expected);
+  assert.deepEqual(extractLbcClues(message), { name: expected.branchName, location: expected.locationHint });
+  const query = new URL(googleBranchSearchUrl(expected.branchName, expected.locationHint)).searchParams.get('q');
+  assert.match(query, /Imall Canlubang/);
+  assert.match(query, /Calamba/);
+  assert.doesNotMatch(query, /Riz|Lawrence|Quejada|09568142493/);
+  assert.deepEqual(parsePickupMessage('Imall Canlubang, Calamba City Laguna\n09568142493\nlbc branch pickup\nRiz Lawrence Quejada'), expected);
+  assert.deepEqual(extractLbcClues('lbc branch pickup\nRiz Lawrence Quejada\n09568142493'), {});
+});
+
+test('correct confirms only the immediately preceding sourced LBC branch', () => {
+  const messages = [
+    { role: 'user', content: 'Find LBC Arayat Cubao Quezon City' },
+    { role: 'assistant', content: 'LBC Express - ARAYAT\n39 ARAYAT COR. MALABITO ST., CUBAO, QUEZON CITY\nSource: https://www.lbcexpress.com/branches-philippines/Arayat' },
+    { role: 'user', content: 'correct' },
+  ];
+  assert.deepEqual(confirmedBranchClues(messages), { name: 'Arayat Cubao Quezon City' });
+  assert.equal(confirmedBranchClues([...messages, { role: 'assistant', content: 'Anything else?' }, { role: 'user', content: 'correct' }]), null);
+  assert.equal(confirmedBranchClues([messages[0], { role: 'assistant', content: 'LBC Express - ARAYAT\nNo official source' }, messages[2]]), null);
+  const confirmed = { role: 'assistant', content: 'Confirmed LBC Express - ARAYAT.\n39 ARAYAT COR. MALABITO ST., CUBAO, QUEZON CITY\nSource: https://www.lbcexpress.com/branches-philippines/Arayat\nSend the buyer\'s name and phone number to prepare the pickup form.' };
+  assert.equal(confirmedBranchForBuyerReply([confirmed, { role: 'user', content: 'Nilo Sample\n09170009993' }]), 'LBC Express - ARAYAT');
+  assert.equal(confirmedBranchForBuyerReply([messages[1], { role: 'user', content: 'Nilo Sample\n09170009993' }]), null);
+});
+
 test('pickup parser leaves door-delivery messages to the normal assistant', () => {
   assert.equal(parsePickupMessage('Sample Buyer\n09171234567\n123 Sample Street, Calamba'), null);
+  assert.equal(parsePickupMessage('add buyer\nJeff Baluyot\n09762646254\nLBC door to door - 0911 Peony st. Greenland Subd. Brgy. San Juan Cainta Rizal 1900'), null);
 });
 
 test('pickup parser accepts an add-buyer command before the pasted details', () => {
@@ -104,7 +133,10 @@ test('address-only reply reuses the immediately preceding pickup request', () =>
     { role: 'assistant', content: 'Please provide the LBC branch address.' },
     { role: 'user', content: 'Medical Center Compound, 83 JP Rizal St, Project 4, Quezon City, 1100 Metro Manila' },
   ];
-  assert.deepEqual(parsePickupAddressFollowUp(messages), parsePickupMessage(messages[0].content));
+  assert.deepEqual(parsePickupAddressFollowUp(messages), {
+    ...parsePickupMessage(messages[0].content),
+    branchAddress: 'Medical Center Compound, 83 JP Rizal St, Project 4, Quezon City, 1100 Metro Manila',
+  });
   assert.equal(parsePickupAddressFollowUp([...messages.slice(0, 2), { role: 'user', content: 'yes' }]), null);
 });
 

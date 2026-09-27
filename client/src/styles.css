@@ -259,7 +259,16 @@ h2 { margin-bottom: 7px; font-size: 1rem; line-height: 1.25; letter-spacing: -.0
 .assistant-messages { min-height: 0; overflow-y: auto; padding: 18px 16px 10px; scrollbar-color: var(--strong-rule) transparent; }
 .assistant-message { width: fit-content; max-width: 90%; margin-bottom: 12px; padding: 11px 13px; border-radius: 12px; background: var(--surface); font-size: .9rem; line-height: 1.48; overflow-wrap: anywhere; white-space: pre-wrap; }
 .assistant-message.user { margin-left: auto; background: var(--yellow); color: var(--on-yellow); }
-.assistant-result-link { display: block; margin-top: 10px; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.assistant-message-text { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
+.assistant-message.user .assistant-message-text::selection { background: #174ea6; color: #fff; }
+.assistant-copy-button { display: flex; align-items: center; gap: 5px; width: fit-content; margin-top: 8px; padding: 3px 0; border: 0; background: transparent; color: var(--on-yellow); font: inherit; font-size: .72rem; font-weight: 700; cursor: pointer; }
+.assistant-result-link { display: block; width: fit-content; margin-top: 10px; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.assistant-choices { display: grid; gap: 7px; margin-top: 10px; }
+.assistant-choice { display: grid; gap: 3px; }
+.assistant-choices button { display: grid; gap: 2px; width: 100%; padding: 9px; border: 1px solid var(--strong-rule); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.assistant-choices button:disabled { opacity: .5; cursor: wait; }
+.assistant-choices span { font-size: .77rem; overflow-wrap: anywhere; }
+.assistant-choice a { width: fit-content; color: inherit; font-size: .76rem; text-decoration: underline; }
 .draft-review { margin: 0 0 22px; padding: 16px 18px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); }
 .draft-review p { margin: 0; }
 .draft-review-links { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; }

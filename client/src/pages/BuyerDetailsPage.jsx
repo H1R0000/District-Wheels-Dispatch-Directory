@@ -24,7 +24,7 @@ export default function BuyerDetailsPage() {
   const [selectedPickupId, setSelectedPickupId] = useState('');
   const [copyStatus, setCopyStatus] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
-  const [notice, setNotice] = useState(routeLocation.state?.saved ? 'Buyer saved successfully.' : '');
+  const [notice, setNotice] = useState(routeLocation.state?.saved === 'updated' ? 'Buyer updated successfully. Current delivery details are shown below.' : routeLocation.state?.saved ? 'Buyer created successfully. Delivery details are shown below.' : '');
 
   useEffect(() => {
     const controller = new AbortController();
