@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react';
 import { buildBuyerPayload } from '../utils/buyerPayload.js';
 import { getBuyer, saveBuyer } from '../lib/buyers.js';
 import { applyAssistantEdit, editedDeliveryMethod } from '../utils/assistantEdit.js';
+import { formatBuyerName } from '../../../shared/buyerName.js';
 
 const emptyAddress = () => ({ street: '', barangay: '', city: '', province: '', zipCode: '', isDefault: false });
 const emptyPickup = () => ({ branchName: '', branchAddress: '', isDefault: false });
@@ -14,7 +15,7 @@ function buyerFromAssistantDraft(draft) {
   const courier = draft.preferredCourier === 'J&T Express' ? 'J&T Express' : 'LBC';
   const method = courier === 'J&T Express' ? 'door' : draft.deliveryMethod === 'door' ? 'door' : 'pickup';
   return {
-    name: String(draft.name ?? ''),
+    name: formatBuyerName(draft.name),
     phone: String(draft.phone ?? ''),
     preferredCourier: courier,
     addresses: method === 'door' ? [{ ...emptyAddress(), ...Object.fromEntries(Object.keys(emptyAddress()).filter((field) => field !== 'isDefault').map((field) => [field, String(draft.address?.[field] ?? '')])), isDefault: true }] : [],
@@ -186,7 +187,7 @@ export default function BuyerFormPage() {
         <section className="panel form-section">
           <div className="section-heading"><div><h2>Buyer information</h2><p>Contact and courier preference.</p></div></div>
           <div className="form-grid">
-            <label><span>Full name</span><input required name="name" autoComplete="name" maxLength="120" value={buyer.name} onChange={(event) => setBuyer({ ...buyer, name: event.target.value })} aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'name-error' : undefined} /><FieldError id="name-error">{errors.name}</FieldError></label>
+            <label><span>Full name</span><input required name="name" autoComplete="name" maxLength="120" value={buyer.name} onChange={(event) => setBuyer({ ...buyer, name: event.target.value })} onBlur={() => setBuyer((current) => ({ ...current, name: formatBuyerName(current.name) }))} aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'name-error' : undefined} /><FieldError id="name-error">{errors.name}</FieldError></label>
             <label><span>Phone number</span><input required name="phone" type="tel" inputMode="tel" autoComplete="tel" maxLength="32" placeholder="Example: 0917 123 4567" value={buyer.phone} onChange={(event) => setBuyer({ ...buyer, phone: event.target.value })} aria-invalid={Boolean(errors.phone)} aria-describedby={errors.phone ? 'phone-hint phone-error' : 'phone-hint'} /><small className="field-hint" id="phone-hint">Spaces and punctuation are removed when saved.</small><FieldError id="phone-error">{errors.phone}</FieldError></label>
             <label><span>Preferred courier</span><select name="preferredCourier" value={buyer.preferredCourier} onChange={(event) => changeCourier(event.target.value)} aria-invalid={Boolean(errors.preferredCourier)} aria-describedby={errors.preferredCourier ? 'courier-error' : undefined}><option value="LBC">LBC</option><option value="J&T Express">J&amp;T Express</option></select><FieldError id="courier-error">{errors.preferredCourier}</FieldError></label>
           </div>

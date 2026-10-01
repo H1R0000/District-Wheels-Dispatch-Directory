@@ -1,3 +1,5 @@
+import { formatBuyerName } from '../../../shared/buyerName.js';
+
 const emptyAddress = () => ({ street: '', barangay: '', city: '', province: '', zipCode: '', isDefault: true });
 const emptyPickup = () => ({ branchName: '', branchAddress: '', isDefault: true });
 
@@ -5,7 +7,7 @@ export function applyAssistantEdit(buyer, patch) {
   if (!patch) return buyer;
   const next = {
     ...buyer,
-    name: patch.name ?? buyer.name,
+    name: patch.name == null ? buyer.name : formatBuyerName(patch.name),
     phone: patch.phone ?? buyer.phone,
     preferredCourier: patch.preferred_courier ?? buyer.preferredCourier,
   };

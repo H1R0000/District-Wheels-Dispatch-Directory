@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { seedBuyers } from './seed-data.js';
 import { normalizePhone } from './phone.js';
+import { formatBuyerName } from '../shared/buyerName.js';
 
 const clone = (value) => structuredClone(value);
 
@@ -19,13 +20,14 @@ function trimLocation(item) {
 
 function prepareBuyer(input, existingId) {
   const phone = normalizePhone(input.phone);
+  const name = formatBuyerName(input.name);
   return {
     id: existingId ?? `buyer-${randomUUID()}`,
-    name: input.name.trim(),
+    name,
     phone,
     preferredCourier: input.preferredCourier,
-    addresses: normalizeDefaults((input.addresses ?? []).map((item) => ({ ...trimLocation(item), recipientName: input.name.trim(), recipientPhone: phone, id: item.id || `address-${randomUUID()}` }))),
-    pickups: normalizeDefaults((input.pickups ?? []).map((item) => ({ ...trimLocation(item), recipientName: input.name.trim(), recipientPhone: phone, id: item.id || `pickup-${randomUUID()}` }))),
+    addresses: normalizeDefaults((input.addresses ?? []).map((item) => ({ ...trimLocation(item), recipientName: name, recipientPhone: phone, id: item.id || `address-${randomUUID()}` }))),
+    pickups: normalizeDefaults((input.pickups ?? []).map((item) => ({ ...trimLocation(item), recipientName: name, recipientPhone: phone, id: item.id || `pickup-${randomUUID()}` }))),
   };
 }
 

@@ -2,6 +2,7 @@ import pg from 'pg';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { normalizePhone } from './phone.js';
+import { formatBuyerName } from '../shared/buyerName.js';
 
 const { Pool } = pg;
 
@@ -69,17 +70,18 @@ export class PostgresStore {
     const addresses = normalizeDefaults(input.addresses);
     const pickups = normalizeDefaults(input.pickups);
     const phone = normalizePhone(input.phone);
+    const name = formatBuyerName(input.name);
     try {
       await client.query('BEGIN');
-      if (isNew) await client.query('INSERT INTO buyers (id, name, phone, preferred_courier) VALUES ($1, $2, $3, $4)', [id, input.name.trim(), phone, input.preferredCourier]);
+      if (isNew) await client.query('INSERT INTO buyers (id, name, phone, preferred_courier) VALUES ($1, $2, $3, $4)', [id, name, phone, input.preferredCourier]);
       else {
-        const result = await client.query('UPDATE buyers SET name = $2, phone = $3, preferred_courier = $4, updated_at = NOW() WHERE id = $1', [id, input.name.trim(), phone, input.preferredCourier]);
+        const result = await client.query('UPDATE buyers SET name = $2, phone = $3, preferred_courier = $4, updated_at = NOW() WHERE id = $1', [id, name, phone, input.preferredCourier]);
         if (result.rowCount === 0) { await client.query('ROLLBACK'); return null; }
         await client.query('DELETE FROM addresses WHERE buyer_id = $1', [id]);
         await client.query('DELETE FROM pickup_locations WHERE buyer_id = $1', [id]);
       }
-      for (const item of addresses) await client.query('INSERT INTO addresses (id, buyer_id, recipient_name, recipient_phone, street, barangay, city, province, zip_code, is_default) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [item.id || `address-${randomUUID()}`, id, input.name.trim(), phone, item.street.trim(), item.barangay.trim(), item.city.trim(), item.province.trim(), item.zipCode.trim(), item.isDefault]);
-      for (const item of pickups) await client.query('INSERT INTO pickup_locations (id, buyer_id, recipient_name, recipient_phone, branch_name, branch_address, is_default) VALUES ($1,$2,$3,$4,$5,$6,$7)', [item.id || `pickup-${randomUUID()}`, id, input.name.trim(), phone, item.branchName.trim(), item.branchAddress.trim(), item.isDefault]);
+      for (const item of addresses) await client.query('INSERT INTO addresses (id, buyer_id, recipient_name, recipient_phone, street, barangay, city, province, zip_code, is_default) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [item.id || `address-${randomUUID()}`, id, name, phone, item.street.trim(), item.barangay.trim(), item.city.trim(), item.province.trim(), item.zipCode.trim(), item.isDefault]);
+      for (const item of pickups) await client.query('INSERT INTO pickup_locations (id, buyer_id, recipient_name, recipient_phone, branch_name, branch_address, is_default) VALUES ($1,$2,$3,$4,$5,$6,$7)', [item.id || `pickup-${randomUUID()}`, id, name, phone, item.branchName.trim(), item.branchAddress.trim(), item.isDefault]);
       await client.query('COMMIT');
       return this.get(id);
     } catch (error) { await client.query('ROLLBACK'); throw error; }

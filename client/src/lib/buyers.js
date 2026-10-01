@@ -1,21 +1,23 @@
 import { supabase } from './supabase.js';
 import { buildBuyerSearchFilter } from '../utils/buyerSearch.js';
+import { formatBuyerName } from '../../../shared/buyerName.js';
+
 function normalizePhone(value = '') {
   return String(value).replace(/\D/g, '');
 }
 
 function mapAddress(row) {
-  return { id: row.id, recipientName: row.recipient_name, recipientPhone: row.recipient_phone, street: row.street, barangay: row.barangay, city: row.city, province: row.province, zipCode: row.zip_code, isDefault: row.is_default };
+  return { id: row.id, recipientName: formatBuyerName(row.recipient_name), recipientPhone: row.recipient_phone, street: row.street, barangay: row.barangay, city: row.city, province: row.province, zipCode: row.zip_code, isDefault: row.is_default };
 }
 
 function mapPickup(row) {
-  return { id: row.id, recipientName: row.recipient_name, recipientPhone: row.recipient_phone, branchName: row.branch_name, branchAddress: row.branch_address, isDefault: row.is_default };
+  return { id: row.id, recipientName: formatBuyerName(row.recipient_name), recipientPhone: row.recipient_phone, branchName: row.branch_name, branchAddress: row.branch_address, isDefault: row.is_default };
 }
 
 function mapBuyer(row) {
   const addresses = (row.addresses ?? []).map(mapAddress);
   const pickups = (row.pickup_locations ?? []).map(mapPickup);
-  return { id: row.id, name: row.name, phone: row.phone, preferredCourier: row.preferred_courier, addresses, pickups, addressCount: addresses.length, pickupCount: pickups.length };
+  return { id: row.id, name: formatBuyerName(row.name), phone: row.phone, preferredCourier: row.preferred_courier, addresses, pickups, addressCount: addresses.length, pickupCount: pickups.length };
 }
 
 function clean(value) { return String(value ?? '').trim(); }
@@ -27,7 +29,7 @@ export async function listBuyers(query = '') {
   if (searchFilter) request = request.or(searchFilter);
   const { data, error } = await request;
   if (error) throw error;
-  return data.map(mapBuyer);
+  return data.map(mapBuyer).sort((left, right) => left.name.localeCompare(right.name, 'en-PH', { sensitivity: 'base', numeric: true }));
 }
 
 export async function getBuyer(id) {
@@ -50,7 +52,7 @@ export async function saveBuyer(input, id) {
   };
   const payload = {
     id: buyerId,
-    name: clean(input.name),
+    name: formatBuyerName(input.name),
     phone,
     preferredCourier: input.preferredCourier,
     addresses: makeLocations(input.addresses ?? [], 'address', ['street', 'barangay', 'city', 'province', 'zipCode']),

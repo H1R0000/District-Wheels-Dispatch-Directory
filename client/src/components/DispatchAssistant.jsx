@@ -1,14 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bot, Check, Copy, MessageCircle, Send, X } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
 import { useAppAuth } from '../lib/AuthContext.jsx';
 import { draftMethodConflict } from '../utils/assistantDraft.js';
+import { insertPromptTemplate, resizeComposer, shouldSendOnEnter, suggestedPrompts } from '../utils/assistantComposer.js';
 
 const welcomeMessage = { id: 'welcome', role: 'assistant', content: 'Paste a buyer’s details here, even if they are just a few lines. I’ll ask whether LBC delivery is Door to door or Branch pickup when needed, then prepare a form for you to review. You can also ask me to edit a buyer or look up an LBC branch or ZIP code.' };
 
 function chatStorageKey(userId) {
   return `dcw-dispatch-chat:${userId}`;
+}
+
+function draftStorageKey(userId) {
+  return `dcw-dispatch-draft:${userId}`;
+}
+
+function loadDraft(userId) {
+  try { return window.sessionStorage.getItem(draftStorageKey(userId)) ?? ''; }
+  catch { return ''; }
 }
 
 function loadMessages(userId) {
@@ -58,11 +68,12 @@ export default function DispatchAssistant() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState(() => loadMessages(userId));
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(() => loadDraft(userId));
   const [busy, setBusy] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState(null);
   const inputRef = useRef(null);
   const messagesRef = useRef(null);
+  const panelRef = useRef(null);
 
   useEffect(() => {
     try {
@@ -71,6 +82,37 @@ export default function DispatchAssistant() {
       // Chat still works in memory if session storage is unavailable or full.
     }
   }, [messages, userId]);
+
+  useEffect(() => {
+    try { window.sessionStorage.setItem(draftStorageKey(userId), value); }
+    catch { /* Keep the unfinished message in memory if storage is unavailable. */ }
+  }, [value, userId]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const history = messagesRef.current;
+    const nearBottom = history && history.scrollHeight - history.scrollTop - history.clientHeight < 48;
+    resizeComposer(inputRef.current);
+    if (nearBottom) history.scrollTop = history.scrollHeight;
+  }, [value, open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const viewport = window.visualViewport;
+    const updateKeyboardOffset = () => {
+      const coveredHeight = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
+      panelRef.current?.style.setProperty('--assistant-keyboard-offset', `${Math.round(coveredHeight)}px`);
+    };
+    updateKeyboardOffset();
+    viewport?.addEventListener('resize', updateKeyboardOffset);
+    viewport?.addEventListener('scroll', updateKeyboardOffset);
+    window.addEventListener('resize', updateKeyboardOffset);
+    return () => {
+      viewport?.removeEventListener('resize', updateKeyboardOffset);
+      viewport?.removeEventListener('scroll', updateKeyboardOffset);
+      window.removeEventListener('resize', updateKeyboardOffset);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (open) messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: 'smooth' });
@@ -118,6 +160,15 @@ export default function DispatchAssistant() {
     return submitMessage(value);
   }
 
+  function selectPrompt(template) {
+    setValue((current) => insertPromptTemplate(current, template));
+    window.requestAnimationFrame(() => {
+      const input = inputRef.current;
+      input?.focus();
+      input?.setSelectionRange(input.value.length, input.value.length);
+    });
+  }
+
   async function copyMessage(message) {
     try {
       const copyField = document.createElement('textarea');
@@ -141,10 +192,10 @@ export default function DispatchAssistant() {
   }
 
   return <>
-    <button className="assistant-launcher" type="button" onClick={() => setOpen((current) => !current)} aria-label={open ? 'Close dispatch assistant' : 'Open dispatch assistant'} aria-expanded={open} aria-controls="dispatch-assistant-panel">
+    <button className={`assistant-launcher${open ? ' is-open' : ''}`} type="button" onClick={() => setOpen((current) => !current)} aria-label={open ? 'Close dispatch assistant' : 'Open dispatch assistant'} aria-expanded={open} aria-controls="dispatch-assistant-panel">
       {open ? <X size={24} /> : <MessageCircle size={24} />}
     </button>
-    {open && <section id="dispatch-assistant-panel" className="assistant-panel" aria-label="AI dispatch assistant">
+    {open && <section ref={panelRef} id="dispatch-assistant-panel" className="assistant-panel" aria-label="AI dispatch assistant">
       <header className="assistant-header">
         <span className="assistant-title"><Bot size={20} /> Dispatch Assistant</span>
         <button type="button" className="assistant-close" onClick={() => setOpen(false)} aria-label="Close assistant"><X size={19} /></button>
@@ -161,14 +212,19 @@ export default function DispatchAssistant() {
         {busy && <div className="assistant-message assistant" role="status">Thinking…</div>}
       </div>
       <form className="assistant-composer" onSubmit={send}>
+        <div className="assistant-prompt-list" role="group" aria-label="Suggested messages">
+          {suggestedPrompts.map(({ label, template }) => <button key={label} className="assistant-prompt" type="button" onClick={() => selectPrompt(template)}>{label}</button>)}
+        </div>
         <textarea ref={inputRef} rows={2} value={value} onChange={(event) => setValue(event.target.value)} onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+          const touchOnly = window.matchMedia?.('(pointer: coarse)').matches && !window.matchMedia?.('(any-pointer: fine)').matches;
+          if (shouldSendOnEnter({ key: event.key, shiftKey: event.shiftKey, isComposing: event.nativeEvent.isComposing, keyCode: event.nativeEvent.keyCode }, touchOnly)) {
             event.preventDefault();
             event.currentTarget.form?.requestSubmit();
           }
         }} placeholder="Type buyer details or ask a question…" aria-label="Message" />
         <button type="submit" disabled={busy || !value.trim()} aria-label="Send message"><Send size={19} /></button>
-        <span className="assistant-composer-hint">Enter to send · Shift+Enter for a new line</span>
+        <span className="assistant-composer-hint assistant-desktop-hint">Enter to send · Shift+Enter for a new line</span>
+        <span className="assistant-composer-hint assistant-mobile-hint">Tap Send · Enter for a new line</span>
       </form>
     </section>}
   </>;

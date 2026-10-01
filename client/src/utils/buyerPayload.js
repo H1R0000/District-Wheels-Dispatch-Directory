@@ -1,3 +1,5 @@
+import { formatBuyerName } from '../../../shared/buyerName.js';
+
 const addressFields = ['street', 'barangay', 'city', 'province', 'zipCode'];
 const pickupFields = ['branchName', 'branchAddress'];
 
@@ -11,6 +13,7 @@ export function buildBuyerPayload(buyer, deliveryMethod) {
 
   return {
     ...buyer,
+    name: formatBuyerName(buyer.name),
     addresses: buyer.preferredCourier === 'J&T Express' || deliveryMethod === 'door'
       ? buyer.addresses
       : completeAddresses,
