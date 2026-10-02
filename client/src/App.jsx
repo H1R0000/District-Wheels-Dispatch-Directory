@@ -2,6 +2,7 @@ import { Link, Route, Routes } from 'react-router-dom';
 import BuyerDetailsPage from './pages/BuyerDetailsPage.jsx';
 import BuyerDirectoryPage from './pages/BuyerDirectoryPage.jsx';
 import BuyerFormPage from './pages/BuyerFormPage.jsx';
+import OwnerBackupPage from './pages/OwnerBackupPage.jsx';
 import AppHeader from './components/AppHeader.jsx';
 import DispatchAssistant from './components/DispatchAssistant.jsx';
 
@@ -15,6 +16,7 @@ export default function App() {
           <Route path="/buyers/new" element={<BuyerFormPage />} />
           <Route path="/buyers/:buyerId" element={<BuyerDetailsPage />} />
           <Route path="/buyers/:buyerId/edit" element={<BuyerFormPage />} />
+          <Route path="/owner/backup" element={<OwnerBackupPage />} />
           <Route path="*" element={<div className="page"><h1>Page not found</h1><Link to="/">Return to directory</Link></div>} />
         </Routes>
       </main>
