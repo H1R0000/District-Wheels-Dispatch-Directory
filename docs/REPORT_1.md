@@ -1,5 +1,7 @@
 # Project Increment Report - Week 1
 
+> Historical Week 1 checkpoint. The items under “What is left” describe work remaining at that time. See the [current README](../README.md) and [updated proposal milestones](proposal.md) for the present status.
+
 ## Week of: September 14-20, 2026
 
 ## Project

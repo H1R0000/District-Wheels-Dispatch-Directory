@@ -1,5 +1,7 @@
 # Project Increment Report - Week 2
 
+> Historical Week 2 checkpoint. The earlier build failure and “What is left” section describe the state before the release addendum below. See the [current README](../README.md) and [updated proposal milestones](proposal.md) for the present status.
+
 ## Week of: September 21-27, 2026
 
 **Status as of September 26, 2026**

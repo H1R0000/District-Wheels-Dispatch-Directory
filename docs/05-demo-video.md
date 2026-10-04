@@ -1,6 +1,10 @@
 # Demo video
 
-**Recording:** Not linked yet. Add the finished video URL here and in the [main README](../README.md) after recording it.
+**Recording:** Not linked yet. The app is live, but a finished video has not been provided. Add its URL here and in the [main README](../README.md) after recording it.
+
+On October 4, 2026, the deployed demo opened, displayed three fictional buyers, copied shipping details, and returned a Dispatch Assistant response. Record a fresh check immediately before filming because live services can change.
+
+The recording itself remains to be done; the checklist below is for recording day.
 
 ## Suggested walkthrough
 

@@ -12,7 +12,7 @@ District Wheels Dispatch Directory stores buyer names, phone numbers, and delive
 ## Application access
 
 - Supabase Auth identifies users. Database row-level security policies protect buyers, addresses, pickup locations, profiles, and audit logs. The owner and demo profiles have separate data; the demo uses fictional shared records.
-- The public demo-session function checks allowed origins and claims a rate-limited sign-in slot before returning a demo session. The assistant checks the caller's Supabase user and approved profile. These checks still need verification against the deployed Supabase configuration.
+- The public demo-session function checks allowed origins and claims a rate-limited sign-in slot before returning a demo session. The assistant checks the caller's Supabase user and approved profile. The deployed demo sign-in and assistant response worked on October 4, 2026; owner-only access and hosted policy configuration remain to be verified separately.
 - Buyer changes use database functions that save or delete records and their audit entries together. The assistant prepares add and edit forms for review; deleting through chat requires a separate confirmation code.
 - The optional Express buyer API has no Supabase user context. It is disabled unless `ENABLE_LEGACY_API=true`; do not expose it publicly in that mode. Its PostgreSQL data queries use parameters, its request body has a size limit, and its error response omits stack traces. It does not implement every control suggested by the example checklist, such as authenticated buyer routes or length limits on every input field.
 
@@ -27,8 +27,9 @@ District Wheels Dispatch Directory stores buyer names, phone numbers, and delive
 
 - [ ] Confirm the hosted owner allowlist, Supabase Auth redirect URLs, Edge Function origins, and row-level policies match the intended deployment. Test owner, demo, unapproved, and anonymous access as described in the [rollout guide](demo-owner-rollout.md).
 - [ ] Inspect the full Git history and screenshots for secrets and real personal information. Rotate any exposed secret before cleaning up history.
-- [ ] Run a dependency audit, review findings, and record any accepted issues. This document does not claim that an audit has passed.
+- [x] Run a dependency audit. On October 4, 2026, `npm audit` reported zero vulnerabilities across all dependencies, including development tools. `npm audit --omit=dev` also reported zero for production dependencies.
 - [ ] Verify the live assistant's third-party data handling and decide what notice or consent is needed before entering real buyer details.
-- [ ] Check that private backups stay outside Git and can be restored by the approved owner.
+- [x] Check repository backup exclusions: `.gitignore` excludes `backups/`, and the current tracked-file list contains no backup file.
+- [ ] Verify a private backup can be restored by the approved owner in the hosted app without changing existing records.
 
 The main remaining privacy risk is sending real buyer details to the assistant's external model. Until that handling has been reviewed, use fictional demo data and minimize what is entered into chat.

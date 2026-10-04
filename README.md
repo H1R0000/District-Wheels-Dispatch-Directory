@@ -131,7 +131,7 @@ npm test
 npm run build
 ```
 
-On September 26, 2026, all 38 local tests and the production build passed. The build script uses Vite's runner config loader to work in the restricted Windows workspace.
+On October 4, 2026, all 75 local tests and the production build passed. The full npm dependency audit reported zero vulnerabilities. The build script uses Vite's runner config loader to work in the restricted Windows workspace.
 
 ## 6. Deploy to Vercel
 
@@ -146,6 +146,8 @@ The root [`vercel.json`](vercel.json) builds the Vite app with `npm run build`, 
 5. Test a fresh browser session, a direct refresh of `/buyers/new` and a buyer detail route, GitHub sign-in, the demo, and the dispatch workflow.
 
 See [demo and owner rollout](docs/demo-owner-rollout.md) for Supabase setup and release checks.
+
+On October 4, 2026, a live demo session loaded the three fictional buyers. The `/` search shortcut focused search, typing filtered the records, Escape cleared it, copying all shipping details showed success feedback, and the Dispatch Assistant answered a non-sensitive question. This smoke check did not test owner-only access or backup restore.
 
 ## 7. Known limits
 
@@ -167,7 +169,7 @@ I used Codex to implement much of the later feature code and to polish and debug
 
 - [Project documents index](docs/README.md)
 - [Project proposal](docs/proposal.md)
-- [Week 1 increment report](docs/week-1-increment-report.md)
+- [Week 1 increment report](docs/REPORT_1.md)
 - [Week 2 increment report](docs/REPORT_2.md)
 - [Wireframe documentation](docs/wireframes.md)
 - [Wireframe PDF](docs/pdf/District-Wheels-Wireframes.pdf)

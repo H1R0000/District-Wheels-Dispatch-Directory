@@ -11,7 +11,7 @@ This page gathers the existing progress records in the same numbered docs sequen
 - Exported wireframes and design system as PDFs. Corrected spacing and alignment problems found during review.
 - Identified the data rule for multiple locations with only one default of each type as the main implementation risk.
 
-Read the [Week 1 increment report](week-1-increment-report.md) and [Week 1 reflection](../journal/week-1.md) for the original account.
+Read the [Week 1 increment report](REPORT_1.md) and [Week 1 reflection](../journal/week-1.md) for the original account.
 
 ## Week of September 21–27, 2026
 
@@ -27,3 +27,7 @@ Read the [Week 2 increment report](REPORT_2.md) and [Week 2 reflection](../journ
 ## Later updates
 
 Later commits improved the assistant, buyer-name formatting, navigation, backup access, and the README screenshots. The [AI usage record](../AI-USAGE.md) links the relevant commits and distinguishes self-written work from Codex-written changes. This summary does not rewrite the earlier weekly reports as if those later features were already finished at the time.
+
+## Current verification — October 4, 2026
+
+The current checkout passed all 75 local tests and a production build. A full npm audit reported zero vulnerabilities. The deployed demo loaded fictional buyers, supported keyboard search and copy feedback, and returned an assistant response. The [video recording](05-demo-video.md) and the owner-only checks listed in [security and privacy](06-security-and-privacy.md) remain open.

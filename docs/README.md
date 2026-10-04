@@ -11,7 +11,7 @@ Planning, design, progress, demo, and privacy records for District Wheels Dispat
 | [05-demo-video.md](05-demo-video.md) | Recording plan and link status. | Final demonstration |
 | [06-security-and-privacy.md](06-security-and-privacy.md) | Data safeguards and checks still to complete. | Before using real data |
 
-The original [proposal](proposal.md), [wireframes](wireframes.md), [Week 1 report](week-1-increment-report.md), [Week 2 report](REPORT_2.md), and [design PDF](pdf/District-Wheels-Design-System.pdf) remain available. The [demo and owner rollout guide](demo-owner-rollout.md) covers hosted setup. The [Week 1](../journal/week-1.md) and [Week 2](../journal/week-2.md) journals contain reflections, and [AI-USAGE.md](../AI-USAGE.md) records authorship and AI assistance.
+The original [proposal](proposal.md), [wireframes](wireframes.md), [Week 1 report](REPORT_1.md), [Week 2 report](REPORT_2.md), and [design PDF](pdf/District-Wheels-Design-System.pdf) remain available. The [demo and owner rollout guide](demo-owner-rollout.md) covers hosted setup. The [Week 1](../journal/week-1.md) and [Week 2](../journal/week-2.md) journals contain reflections, and [AI-USAGE.md](../AI-USAGE.md) records authorship and AI assistance.
 
 ## Demo screenshots
 

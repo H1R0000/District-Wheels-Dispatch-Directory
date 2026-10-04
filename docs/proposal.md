@@ -1,6 +1,6 @@
 # Final project proposal: District Wheels Dispatch Directory
 
-This is a working plan. I will update it as the app and its requirements become clearer.
+This is the original working plan. The milestones below were updated after the app was deployed; the [current proposal summary](01-proposal.md) describes the finished structure.
 
 ## The idea
 
@@ -23,8 +23,10 @@ The first version will not book shipments, calculate courier rates, track parcel
 - [x] Add an Express API and a Supabase schema with sign-in access and buyer-level data rules.
 - [x] Finish and verify the connected create, edit, and delete workflows with fictional demo records.
 - [x] Verify database privacy rules and phone layouts; keep the owner records separate from the demo.
-- [ ] Complete final keyboard, copy, and assistant checks on the deployed preview.
-- [ ] Deploy to Vercel and record the final demonstration link.
+- [x] Check keyboard search, shipping-detail copy, and an assistant response on the deployed app with fictional demo data (October 4, 2026).
+- [x] Deploy to Vercel and record the [live app URL](https://district-wheels-dispatch-directory.vercel.app).
+
+The application is deployed and its core demo flow works. The [demo video](05-demo-video.md) still needs a recording link. Owner-only access and backup restore require a separate live check; see [security and privacy](06-security-and-privacy.md).
 
 ## Open questions
 
