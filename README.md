@@ -10,6 +10,13 @@ District Wheels Dispatch Directory helps a fulfillment manager find repeat buyer
 
 The browser app uses Supabase Auth, Database, and Edge Functions. An Express API and JSON or PostgreSQL store remain in the repository for explicit local development and tests; the browser's buyer operations use Supabase directly.
 
+### Built with
+
+- React, React Router, and Vite for the browser interface.
+- Supabase Auth, PostgreSQL, and Edge Functions for the deployed app.
+- Express with an optional JSON or PostgreSQL store for local development and API tests.
+- Vercel for the browser deployment.
+
 ## 2. Setup and installation
 
 ### Prerequisites
@@ -36,6 +43,19 @@ VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
 ```
 
 These values are required: the sign-in screen fails closed when either is missing. Keep service-role keys, demo credentials, and other secrets out of `VITE_` variables and source control. The demo and assistant require their deployed Edge Functions and server-side secrets; `.env` alone does not create a working Supabase project.
+
+### Environment variables
+
+| Name | Used by | Purpose |
+| --- | --- | --- |
+| `VITE_SUPABASE_URL` | Browser build | Public URL of the Supabase project. |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Browser build | Public Supabase publishable key. |
+| `DATABASE_URL` | Optional Express server | PostgreSQL connection string; without it the server uses local JSON storage. |
+| `DATABASE_SSL` | Optional Express server | Set to `true` when its PostgreSQL connection requires SSL. |
+| `ENABLE_LEGACY_API` | Optional Express server | Set to `true` to enable its buyer endpoints for local development. |
+| `PORT` | Optional Express server | Listening port; defaults to `3000`. |
+
+Only the two `VITE_` values belong in the browser configuration. See [demo and owner rollout](docs/demo-owner-rollout.md) for the Edge Function secrets and hosted setup.
 
 ### Run locally
 
@@ -100,6 +120,10 @@ docs/                    Proposal, wireframes, PDFs, and rollout notes
 images/                  District Wheels assets
 ```
 
+### Architecture
+
+The React app is served by Vercel and signs users in through Supabase Auth. It reads and changes buyer records through Supabase, where database policies control access. Supabase Edge Functions handle the demo and Dispatch Assistant workflows. The Express server is a separate local development and test path; the deployed browser app does not call it.
+
 ## 5. Tests and build
 
 ```bash
@@ -128,6 +152,16 @@ See [demo and owner rollout](docs/demo-owner-rollout.md) for Supabase setup and 
 - The assistant and demo require deployed Supabase Edge Functions and configured secrets. A local build alone cannot verify them.
 - Demo records are shared by visitors and may be reset. Do not enter real buyer information in demo mode.
 - The optional Express buyer API has no browser user context and stays disabled unless explicitly enabled for local development.
+
+## What I would do next
+
+- Make fresh Supabase project setup and demo seeding repeatable with a documented command.
+- Add automated checks for the deployed sign-in, demo, and assistant workflows.
+- Decide whether to retire the separate Express path or connect it to the same access controls before any public use.
+
+## AI use
+
+I used Codex to implement much of the later feature code and to polish and debug the app. I designed the workflow, built the first working website, wrote the early changes described in [AI-USAGE.md](AI-USAGE.md), and tested and directed the later work. The [AI usage record](AI-USAGE.md) lists examples, mistakes, corrections, and authorship evidence.
 
 ## Supporting files
 
