@@ -68,9 +68,9 @@ The demo uses fictional records and is isolated from the owner's records. It can
 
 ### Demo screenshots
 
-![Desktop buyer directory in demo mode](docs/screenshots/directory-desktop.png)
+![Desktop buyer directory and Dispatch Assistant in demo mode](docs/screenshots/directory-desktop-2026-10-04.png)
 
-![Phone buyer directory in demo mode](docs/screenshots/directory-mobile.png)
+![Phone buyer directory in demo mode](docs/screenshots/directory-mobile-2026-10-04.png)
 
 ### Optional Express endpoints
 
