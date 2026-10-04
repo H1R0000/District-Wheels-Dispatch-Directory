@@ -165,6 +165,7 @@ I used Codex to implement much of the later feature code and to polish and debug
 
 ## Supporting files
 
+- [Project documents index](docs/README.md)
 - [Project proposal](docs/proposal.md)
 - [Week 1 increment report](docs/week-1-increment-report.md)
 - [Week 2 increment report](docs/REPORT_2.md)
