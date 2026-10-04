@@ -1,5 +1,9 @@
 # District Wheels Dispatch Directory
 
+[![Made with AI assistance](https://img.shields.io/badge/Made_with-AI_assistance-blue)](AI-USAGE.md)
+
+I designed and directed the project, built the first working website, and wrote the earlier buyer sorting and phone-handling changes. Codex built much of the later feature code and helped polish and debug it; see [AI usage and authorship](AI-USAGE.md).
+
 ## 1. Overview
 
 District Wheels Dispatch Directory helps a fulfillment manager find repeat buyers and copy saved shipping details into LBC or J&T Express forms. The Week 1 proposal and wireframes have since become a React application with buyer records, courier-specific locations, authentication, and a fictional-data demo.
