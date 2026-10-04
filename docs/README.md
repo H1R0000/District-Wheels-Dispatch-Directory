@@ -11,6 +11,7 @@ Planning, design, progress, and rollout records for District Wheels Dispatch Dir
 | [Week 1 increment report](week-1-increment-report.md) | Initial planning and design progress. |
 | [Week 2 increment report](REPORT_2.md) | Implementation progress and checks. |
 | [Demo and owner rollout](demo-owner-rollout.md) | Supabase setup, access controls, and release checks. |
+| [Security and privacy](06-security-and-privacy.md) | Repository safeguards, personal-data handling, and checks still to complete. |
 
 The [Week 1](../journal/week-1.md) and [Week 2](../journal/week-2.md) journals contain additional progress notes. The [AI usage record](../AI-USAGE.md) describes authorship and AI assistance.
 
