@@ -57,7 +57,7 @@ function safeGoogleSearchUrl(value) {
 function safeSourceUrl(value) {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && ['www.lbcexpress.com', 'phlpost.gov.ph'].includes(url.hostname) ? url.href : null;
+    return url.protocol === 'https:' && ['www.lbcexpress.com', 'phlpost.gov.ph', 'psgc.cloud'].includes(url.hostname) ? url.href : null;
   } catch {
     return null;
   }

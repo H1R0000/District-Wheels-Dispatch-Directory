@@ -9,6 +9,7 @@ import { editEvidenceError } from './edit-evidence.ts';
 import { doorAddressZip, parseDoorAddress, parseDoorAddressWithPostalRows, parsePartialDoorAddress } from './door-address.ts';
 import { doorBuyerSource, parseBuyerIdentity } from './buyer-input.ts';
 import { parseBuyerAction } from './buyer-action.ts';
+import { geographicZipLookup, postalMatches, zipLookupQuery, zipLookupReply } from './zip-lookup.ts';
 
 const tools = [
   { type: 'function', function: { name: 'search_buyers', description: 'Find buyers by name or phone before editing or deleting.', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } } },
@@ -68,11 +69,7 @@ Deno.serve(async (request) => {
           cell[1].replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&#039;/g, "'").replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim(),
         )
       ).filter((cells) => cells.length >= 4);
-      const tokens = query.toLocaleLowerCase().split(/\s+/).filter((token) => token.length > 2 && !['city', 'municipality'].includes(token));
-      const matches = rows.filter((cells) => /^\d{4}$/.test(query)
-        ? cells[3] === query
-        : tokens.every((token) => `${cells[1]} ${cells[2]}`.toLocaleLowerCase().includes(token))).slice(0, 10);
-      return matches.map(([region, province, locality, postal_code]) => ({ region, province, locality, postal_code, source_url: 'https://phlpost.gov.ph/zip-code-locator/' }));
+      return postalMatches(rows.map(([region, province, locality, postal_code]) => ({ region, province, locality, postal_code, source_url: 'https://phlpost.gov.ph/zip-code-locator/' })), query).slice(0, 11);
     }
 
     async function findLbcBranch(lookup: { name?: string; address?: string; location?: string }) {
@@ -240,7 +237,11 @@ Deno.serve(async (request) => {
         let rows: any = data;
         if (!rows?.length) {
           try { rows = await officialZipLookup(query); }
-          catch { return { error: 'The official ZIP lookup is unavailable right now.' }; }
+          catch { rows = []; }
+          if (!Array.isArray(rows) || !rows.length) {
+            try { rows = await geographicZipLookup(query, fetch); }
+            catch { rows = []; }
+          }
         }
         if (Array.isArray(rows)) {
           const distinct = [...new Map(rows.map((row: any) => [`${row.locality}|${row.province}|${row.postal_code}`, row])).values()];
@@ -337,7 +338,7 @@ Deno.serve(async (request) => {
     function addBuyerResponse(outcome: any) {
       if (outcome.error) return json({ message: outcome.error, existingBuyerId: outcome.existingBuyerId }, 200, headers);
       return json({
-        message: `Review ${outcome.draft.name}'s details in the form before saving.${publicSourceUrl && outcome.draft.deliveryMethod === 'door' ? ' I checked the public city, province, and ZIP against PHLPost.' : ''}`,
+        message: `Review ${outcome.draft.name}'s details in the form before saving.${publicSourceUrl && outcome.draft.deliveryMethod === 'door' ? ` I checked the public city, province, and ZIP against ${publicSourceUrl.includes('phlpost.gov.ph') ? 'PHLPost' : 'the linked geographic source'}.` : ''}`,
         draft: outcome.draft,
         sourceUrl: resolvedPickup?.source_url ?? publicSourceUrl,
       }, 200, headers);
@@ -395,6 +396,12 @@ Deno.serve(async (request) => {
       }
       const outcome = await runTool('edit_buyer', { id: selectedBuyerId, ...directAction.patch });
       return json({ message: outcome.error ?? outcome.message, existingBuyerId: outcome.existingBuyerId, editDraft: outcome.editDraft, sourceUrl: outcome.sourceUrl }, 200, headers);
+    }
+    const zipQuery = zipLookupQuery(latest);
+    if (zipQuery) {
+      const result = await runTool('lookup_zip', { location: zipQuery });
+      if (!Array.isArray(result)) return json({ message: result.error ?? 'The ZIP lookup is unavailable right now.' }, 200, headers);
+      return json({ message: zipLookupReply(result, zipQuery), sourceUrl: result[0]?.source_url ?? publicSourceUrl ?? null }, 200, headers);
     }
     if (!apiKey) return json({ message: 'The assistant has not been configured yet.' }, 503, headers);
     for (let step = 0; step < 4; step++) {
