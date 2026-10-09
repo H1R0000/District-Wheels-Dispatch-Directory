@@ -1,7 +1,7 @@
 export type DeliveryChoice = 'door' | 'pickup' | 'ambiguous' | null;
 
 export function statedDeliveryMethod(message: string): DeliveryChoice {
-  const text = String(message ?? '').toLowerCase().replace(/[-‐‑–—]/g, ' ');
+  const text = String(message ?? '').toLowerCase().replace(/[-‐‑–—]/g, ' ').replace(/\bbranch\s+pickuo\b/g, 'branch pickup');
   const door = /\bdoor\s+to\s+door\b|\bdoor\s+delivery\b|\b(?:delivery|method)\s*:\s*door\b|\b(?:home|house)\s+delivery\b|\bdeliver\s+to\s+(?:my\s+|the\s+)?(?:home|house|address)\b|^\s*door[.!]?\s*$/g;
   const pickup = /\bbranch\s+pick\s*up\b|\bpick\s*up\s+(?:at|from)\s+(?:an?\s+|the\s+)?(?:lbc\s+)?branch\b|\blbc\s+pick\s*up\b|\b(?:delivery|method)\s*:\s*(?:branch\s+)?pick\s*up\b|\b(?:lbc\s+)?branch(?:\s+name)?\s*:|^\s*pick\s*up[.!]?\s*$/g;
   const doorMatches = [...text.matchAll(door)];

@@ -41,7 +41,7 @@ export function conversationBuyer(messages: Message[]): { summary: BuyerSummary 
     if (starts) { summary = {}; changed = true; }
     if (!summary) continue;
     if (identity || pickup) { Object.assign(summary, { name: (pickup ?? identity)!.name, phone: (pickup ?? identity)!.phone }); changed = true; }
-    if (pickup) { Object.assign(summary, { branchName: [pickup.branchName, pickup.locationHint].filter(Boolean).join(', '), deliveryMethod: 'pickup', preferredCourier: 'LBC' }); }
+    if (pickup) { Object.assign(summary, { branchName: [pickup.branchName, pickup.locationHint].filter(Boolean).join(', '), ...(pickup.branchAddress ? { branchAddress: pickup.branchAddress } : {}), deliveryMethod: 'pickup', preferredCourier: 'LBC' }); }
     const fields: Record<string, string> = { name: 'name', phone: 'phone', 'phone number': 'phone', street: 'street', barangay: 'barangay', city: 'city', province: 'province', 'zip code': 'zipCode', zip: 'zipCode', branch: 'branchName', 'branch name': 'branchName', 'branch address': 'branchAddress' };
     const correction = text.match(/^(?:(?:please\s+)?(?:change|set|update|correct)\s+(?:only\s+)?(?:the\s+)?)?(name|phone number|phone|street|barangay|city|province|zip code|zip|branch address|branch name|branch)\s*(?::|\s+to\s+)\s*(.+)$/i);
     if (correction) {
@@ -76,7 +76,7 @@ export function conversationBuyer(messages: Message[]): { summary: BuyerSummary 
 export function buyerRequest(summary: BuyerSummary | null): string | null {
   if (!summary?.name || !summary.phone || !summary.preferredCourier || !summary.deliveryMethod) return null;
   const heading = ['add buyer', `${summary.preferredCourier} ${summary.deliveryMethod === 'pickup' ? 'branch pickup' : 'door to door'}`, summary.name, summary.phone];
-  if (summary.deliveryMethod === 'pickup') return summary.branchName ? [...heading, `LBC ${summary.branchName}`].join('\n') : null;
+  if (summary.deliveryMethod === 'pickup') return summary.branchName ? [...heading, `LBC Branch: ${summary.branchName}`, ...(summary.branchAddress ? [`LBC Branch Address: ${summary.branchAddress}`] : [])].join('\n') : null;
   const address = summary.address;
   if (!address?.street || !address.barangay || !address.city) return null;
   return [...heading, [address.street, `Brgy. ${address.barangay}`, address.city, address.province, address.zipCode].filter(Boolean).join(', ')].join('\n');

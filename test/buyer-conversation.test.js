@@ -3,8 +3,32 @@ import assert from 'node:assert/strict';
 import { buyerRequest, buyerSessionMessages, conversationBuyer, selectedBranch, summaryFields } from '../supabase/functions/dispatch-assistant/buyer-conversation.ts';
 import { parseBuyerIdentity } from '../supabase/functions/dispatch-assistant/buyer-input.ts';
 import { parseDoorAddress } from '../supabase/functions/dispatch-assistant/door-address.ts';
+import { parsePickupMessage, extractLbcClues } from '../supabase/functions/dispatch-assistant/lbc-resolver.ts';
+import { googleBranchSearchUrl } from '../supabase/functions/dispatch-assistant/branch-search-link.ts';
 const user = (content) => ({ role: 'user', content });
 const initial = user('add buyer\nLBC door to door\nAna Example\n09170008881\n12 Palm St, Brgy. San Juan, Cainta, Rizal 1900');
+
+test('labelled pickup with pickuo typo preserves supplied address through corrections', () => {
+  const address = "DCC-1 G-16 DANIEL COMM'L CPLX1, NATIONAL HIGHWAY, BRGY, Calamba City";
+  const lines = ['add a buyer', 'lbc branch pickuo', 'Name: Kyle Joseph I. Example', 'Contact #: 09170008886', 'LBC Branch: LBC Express Parian', `LBC Branch Address: ${address}`];
+  const expected = { name: 'Kyle Joseph I. Example', phone: '09170008886', branchName: 'Parian', branchAddress: address, locationHint: '' };
+  for (const message of [lines.join('\n\n'), [lines[0], ...lines.slice(1).reverse()].join('\n')]) {
+    assert.deepEqual(parsePickupMessage(message), expected);
+    const summary = conversationBuyer([user(message)]).summary;
+    assert.equal(summary.deliveryMethod, 'pickup');
+    assert.equal(summary.branchAddress, address);
+    assert.deepEqual(parsePickupMessage(buyerRequest(summary)), expected);
+    const corrected = conversationBuyer([user(message), user('Change phone to 09170008887')]).summary;
+    assert.equal(parsePickupMessage(buyerRequest(corrected)).branchAddress, address);
+    const clues = extractLbcClues(message);
+    assert.equal(clues.address, address);
+    const query = new URL(googleBranchSearchUrl(clues.name, clues.address)).searchParams.get('q');
+    assert.match(query, /Parian/);
+    assert.doesNotMatch(query, /Kyle|Joseph|09170008886|Contact/);
+  }
+  assert.equal(parsePickupMessage(lines.join('\n') + '\nLBC Branch Address: Another address'), null);
+  assert.equal(parsePickupMessage(lines.join('\n').replace('lbc branch pickuo', 'lbc door to door')), null);
+});
 
 const pastedJnt = 'Add a buyer\n\njnt \nAmmiel C Example\n+639170008885\nPurok 4 san isidro matanda hagonoy bulacan\nSan isidro\nHagonoy\nBulacan\n3002\nPhilippines';
 test('pasted JNT checkout details fill every summary and draft address field', () => {

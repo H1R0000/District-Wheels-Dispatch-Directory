@@ -22,7 +22,7 @@ export type PickupMessage = {
   branchAddress?: string;
 };
 
-const pickupMethodLine = /^(?:lbc(?:\s+express)?\s+)?(?:branch\s*pick\s*up|pick\s*up(?:\s+at\s+(?:the\s+)?branch)?|branch)[.!:]?$/i;
+const pickupMethodLine = /^(?:lbc(?:\s+express)?\s+)?(?:branch\s*(?:pick\s*up|pickuo)|pick\s*up(?:\s+at\s+(?:the\s+)?branch)?|branch)[.!:]?$/i;
 const branchMarker = /\b(?:lbc|branch|mall|imall|puregold|waltermart|robinsons|sm|ayala|gaisano)\b/i;
 
 function locationHint(value: string) {
@@ -32,7 +32,14 @@ function locationHint(value: string) {
 export function parsePickupMessage(message: string): PickupMessage | null {
   const method = statedDeliveryMethod(message);
   if (method === 'door' || method === 'ambiguous') return null;
-  const lines = message.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const inputLines = message.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const addressLabel = /^(?:LBC\s+)?Branch\s+Address\s*:\s*/i;
+  const addresses = inputLines.filter((line) => addressLabel.test(line));
+  if (addresses.length > 1) return null;
+  const branchAddress = addresses[0]?.replace(addressLabel, '').trim();
+  const lines = inputLines.filter((line) => !addressLabel.test(line)).map((line) => line
+    .replace(/^(?:contact|phone|mobile)(?:\s*(?:number|no\.?|#))?\s*:\s*/i, '')
+    .replace(/^(?:LBC\s+)?Branch(?:\s+Name)?\s*:\s*(?:LBC(?:\s+Express)?\s*)?/i, 'LBC '));
   if (/^(?:please\s+)?(?:add|create|save)\s+(?:a\s+|this\s+)?buyer[.!:]?$/i.test(lines[0] ?? '')) lines.shift();
   if (lines.length < 3 || lines.length > 6) return null;
 
@@ -65,6 +72,7 @@ export function parsePickupMessage(message: string): PickupMessage | null {
     phone,
     branchName,
     locationHint: locationHint([...inlineLocation, ...remainder.filter((line) => line !== nameLines[0])].join(', ')),
+    ...(branchAddress ? { branchAddress } : {}),
   };
 }
 
@@ -125,7 +133,7 @@ function clean(value: string) {
 
 export function extractLbcClues(message: string): Clues {
   const name = message.match(/(?:^|\n)\s*(?:LBC\s+)?Branch(?:\s+Name)?\s*:\s*([^\n]+)/i)?.[1];
-  const address = message.match(/(?:^|\n)\s*(?:LBC\s+)?(?:Branch\s+)?Address\s*:\s*([\s\S]*?)(?=\n\s*(?:Name|Contact|Phone|Number|Courier|Delivery|LBC\s+Branch)\s*:|\n\s*(?:find|please|can you)\b|$)/i)?.[1];
+  const address = message.match(/(?:^|\n)\s*(?:LBC\s+)?(?:Branch\s+)?Address\s*:\s*([^\n]+)/i)?.[1];
   if (name || address) return { name: name && clean(name), address: address && clean(address) };
   const pickup = parsePickupMessage(message);
   if (pickup) return { name: pickup.branchName, location: pickup.locationHint };
