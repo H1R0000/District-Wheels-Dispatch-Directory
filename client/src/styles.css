@@ -308,6 +308,20 @@ h2 { margin-bottom: 7px; font-size: 1rem; line-height: 1.25; letter-spacing: -.0
 .assistant-header button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; border: 0; background: transparent; color: var(--ink); cursor: pointer; }
 .assistant-close:hover { background: var(--surface); }
 .assistant-close { width: 40px; border-radius: 8px; }
+.assistant-header .assistant-title { white-space: normal; }
+.assistant-header .assistant-clear { margin-left: auto; flex-shrink: 0; min-height: 44px; padding: 6px; font: inherit; font-size: .75rem; text-decoration: underline; white-space: nowrap; }
+.assistant-buyer-summary { margin-block: 16px 8px; padding: 12px; border: 1px solid var(--strong-rule); border-radius: 12px; background: var(--surface); font-size: .85rem; }
+.assistant-buyer-summary h3 { margin: 0; font-size: 1rem; }
+.assistant-buyer-summary small { margin-left: 8px; font-size: .75rem; font-weight: 400; }
+.assistant-buyer-summary p { margin: 6px 0; }
+.assistant-buyer-summary dl { margin: 0; }
+.assistant-buyer-summary dl > div { display: grid; grid-template-columns: 78px minmax(0, 1fr); align-items: center; border-bottom: 1px solid var(--rule); }
+.assistant-buyer-summary dd { margin: 0; min-width: 0; }
+.assistant-buyer-summary dd button { width: 100%; min-height: 44px; padding: 8px; border: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.assistant-buyer-summary .is-missing { text-decoration: underline; font-weight: 700; }
+.assistant-buyer-summary .assistant-result-link { min-height: 44px; }
+.assistant-delivery-options { display: grid; gap: 8px; margin-top: 12px; }
+.assistant-delivery-options button { min-height: 44px; padding: 8px; background: var(--paper); color: var(--ink); border: 1px solid var(--strong-rule); border-radius: 8px; font: inherit; cursor: pointer; }
 .assistant-messages { min-height: 0; overflow-y: auto; padding: 18px 16px 10px; scrollbar-color: var(--strong-rule) transparent; }
 .assistant-message { width: fit-content; max-width: 90%; margin-bottom: 12px; padding: 11px 13px; border-radius: 12px; background: var(--surface); font-size: .9rem; line-height: 1.48; overflow-wrap: anywhere; white-space: pre-wrap; }
 .assistant-message.user { margin-left: auto; background: var(--yellow); color: var(--on-yellow); }

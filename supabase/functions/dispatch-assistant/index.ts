@@ -10,6 +10,7 @@ import { doorAddressZip, parseDoorAddress, parseDoorAddressWithPostalRows, parse
 import { doorBuyerSource, parseBuyerIdentity } from './buyer-input.ts';
 import { parseBuyerAction } from './buyer-action.ts';
 import { geographicZipLookup, postalMatches, zipLookupQuery, zipLookupReply } from './zip-lookup.ts';
+import { buyerRequest, buyerSessionMessages, conversationBuyer, selectedBranch } from './buyer-conversation.ts';
 
 const tools = [
   { type: 'function', function: { name: 'search_buyers', description: 'Find buyers by name or phone before editing or deleting.', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } } },
@@ -40,7 +41,11 @@ Deno.serve(async (request) => {
     if (!profile) return json({ message: 'This account is not approved.' }, 403, headers);
     const apiKey = Deno.env.get('GROQ_API_KEY');
     const body = await request.json();
-    const messages = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
+    const incoming = buyerSessionMessages(Array.isArray(body.messages) ? body.messages.slice(-40) : []);
+    const selection = selectedBranch(incoming);
+    const conversation = conversationBuyer(incoming);
+    const followUp = conversation.changed && !/\b(?:add|create|save)\s+(?:a\s+|this\s+)?(?:new\s+)?buyer\b/i.test(String(incoming.at(-1)?.content ?? '')) ? buyerRequest(conversation.summary) : null;
+    const messages = incoming.map((message: any, index: number) => ({ role: message.role, content: index === incoming.length - 1 ? followUp ?? (selection ? `Find ${selection.branch_name}` : message.content) : message.content }));
     if (!messages.length) return json({ message: 'Send a message first.' }, 400, headers);
     const latest = String(messages.at(-1)?.content ?? '').trim();
     const confirmation = latest.match(/^DELETE\s+([A-F0-9]{8})$/i);
@@ -56,6 +61,7 @@ Deno.serve(async (request) => {
     const userMessages = messages.filter((message: any) => message?.role === 'user').map((message: any) => String(message.content ?? ''));
     const userText = userMessages.join('\n');
     let parsedPickup = parsePickupMessage(latest) ?? parsePickupAddressFollowUp(messages) ?? parsePickupConfirmation(messages);
+    if (selection && conversation.summary?.name && conversation.summary.phone) parsedPickup = { name: conversation.summary.name, phone: phone(conversation.summary.phone), branchName: selection.branch_name, branchAddress: selection.branch_address, locationHint: '' };
     const deliveryChoice = chooseDeliveryMethod(messages, Boolean(parsedPickup));
     const chosenDelivery = deliveryChoice === 'door' || deliveryChoice === 'pickup' ? deliveryChoice : null;
     const history: any[] = [{ role: 'system', content: `You are the District Wheels Dispatch Assistant. Use tools for every buyer action, ZIP code, or LBC lookup. Never invent records, lookup results, buyer names, phone numbers, addresses, or ZIP codes. Never use placeholder buyer details; ask the user for missing values. Search before editing or deleting. If multiple buyers match, ask for their exact phone number. The delete_buyer tool only prepares a deletion and returns instructions for a separate confirmation message. Never say the buyer was deleted until that separate confirmation succeeds. Use only the minimum data needed. The add_buyer tool prepares a draft; the user reviews and saves it in the form. The edit_buyer tool prepares only user-requested changes for the edit form; it does not save. Never claim a draft or edit was saved. Recognize JNT or J&T as J&T Express. The user's latest delivery choice is ${deliveryChoice ?? 'not stated'}; this choice overrides older messages and your own inference. If the LBC method is ambiguous or missing, ask whether it is Door to door or Branch pickup. For door delivery, collect street or house address, barangay, city, province, and ZIP code. Never invent a street, building, or barangay. For LBC branch pickup, a verified official directory match will supply both the canonical branch name and address. Never ask the user for the missing side of a verified branch pair. If several matches are possible, ask the user to choose. J&T uses door delivery. Ask only for missing details. When a tool reports an error, explain it and ask for the needed correction.` }, ...messages];

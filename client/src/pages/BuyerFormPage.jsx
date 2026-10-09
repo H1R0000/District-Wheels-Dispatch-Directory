@@ -155,6 +155,7 @@ export default function BuyerFormPage() {
       const payload = buildBuyerPayload(buyer, deliveryMethod);
       const result = await saveBuyer(payload, isEditing ? buyerId : undefined);
       if (!result) throw new Error('The save could not be verified. Please check the buyer directory before trying again.');
+      window.dispatchEvent(new CustomEvent('dispatch-buyer-saved', { detail: { buyer: result, edited: isEditing, deliveryMethod } }));
       navigate(`/buyers/${result.id}`, { replace: true, state: { saved: isEditing ? 'updated' : 'created' } });
     } catch (error) {
       setMessage(error.message);

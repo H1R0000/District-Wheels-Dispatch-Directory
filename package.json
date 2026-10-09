@@ -9,7 +9,7 @@
     "dev:client": "vite --config client/vite.config.js --configLoader runner",
     "start": "node server/index.js",
     "build": "vite build --config client/vite.config.js --configLoader runner",
-    "test": "node --test test/api.test.js test/phone.test.js test/lbc-resolver.test.js test/buyer-search.test.js test/buyer-name.test.js test/draft-evidence.test.js test/delivery-method.test.js test/branch-search-link.test.js test/assistant-draft.test.js test/assistant-composer.test.js test/assistant-workflows.test.js test/navigation.test.js test/zip-lookup.test.js"
+    "test": "node --test test/api.test.js test/phone.test.js test/lbc-resolver.test.js test/buyer-search.test.js test/buyer-name.test.js test/draft-evidence.test.js test/delivery-method.test.js test/branch-search-link.test.js test/assistant-draft.test.js test/assistant-composer.test.js test/assistant-workflows.test.js test/navigation.test.js test/zip-lookup.test.js test/buyer-conversation.test.js"
   },
   "dependencies": {
     "@fontsource/barlow-condensed": "^5.3.0",
