@@ -1,4 +1,27 @@
+import { buyerMessageLines } from './buyer-message-lines.ts';
 export type DoorAddress = { street: string; barangay: string; city: string; province: string; zip_code: string };
+
+function splitDoorDetails(message: string) {
+  const lines = buyerMessageLines(message);
+  const index = lines.findIndex((line) => /\b(?:brgy\.?|barangay)\s+/i.test(line));
+  const match = lines[index]?.match(/^(.+?)\s+(?:brgy\.?|barangay)\s+([^,]+)$/i);
+  if (!match || match[1].includes(',')) return null;
+  const tail = lines.slice(index + 1).filter((line) => !/^(?:Philippines|PH)$/i.test(line));
+  const zip = tail.at(-1);
+  if (!zip || !/^\d{4}$/.test(zip) || tail.length < 2 || tail.length > 3) return null;
+  const locality = tail.slice(0, -1);
+  // Commas or separate lines make the city/region boundary explicit.
+  const places = locality.join(', ').split(',').map((part) => part.trim()).filter(Boolean);
+  const address: Partial<DoorAddress> = { street: match[1].trim(), barangay: match[2].trim(), zip_code: zip };
+  if (places.length === 2) Object.assign(address, { city: places[0], province: places[1] });
+  return { address, locality: locality.join(' / ') };
+}
+
+export function doorLocationQuestion(message: string): string | null {
+  const details = splitDoorDetails(message);
+  if (!details || details.address.city) return null;
+  return `I have the name, phone, street and ZIP code. Please confirm the barangay, city and province/region: you wrote “${details.address.barangay}” and “${details.locality}”.`;
+}
 
 // Recognize the common pasted checkout layout after the buyer's phone.
 // Keep the full street line: repeated locality text may include a subdivision.
@@ -16,7 +39,7 @@ function multilineDoorAddress(lines: string[]): DoorAddress | null {
 }
 
 export function doorAddressZip(message: string) {
-  const lines = String(message ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const lines = buyerMessageLines(message);
   if (!/\b(?:door\s*to\s*door|door\s*delivery|j\s*(?:&|and|n|\+)\s*t|jnt)\b/i.test(message)) return null;
   const line = [...lines].reverse().find((item) => /\b(?:brgy\.?|barangay)\s+/i.test(item) && /\b\d{4}\s*$/.test(item));
   return line?.match(/\b(\d{4})\s*$/)?.[1] ?? null;
@@ -45,10 +68,12 @@ export function parseDoorAddressWithPostalRows(message: string, rows: Array<{ lo
 }
 
 export function parsePartialDoorAddress(message: string): Partial<DoorAddress> | null {
-  const lines = String(message ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const lines = buyerMessageLines(message);
   if (!/\b(?:door\s*to\s*door|door\s*delivery|j\s*(?:&|and|n|\+)\s*t|jnt)\b/i.test(message)) return null;
   const multiline = multilineDoorAddress(lines);
   if (multiline) return multiline;
+  const split = splitDoorDetails(message);
+  if (split) return split.address;
   const line = [...lines].reverse().find((item) => /\b(?:brgy\.?|barangay)\s+/i.test(item));
   if (!line) return null;
   const address = line

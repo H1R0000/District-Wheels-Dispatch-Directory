@@ -6,7 +6,7 @@ import { chooseDeliveryMethod } from './delivery-method.ts';
 import { googleBranchSearchUrl } from './branch-search-link.ts';
 import { buyerChoicesMessage, selectBuyer } from './buyer-selection.ts';
 import { editEvidenceError } from './edit-evidence.ts';
-import { doorAddressZip, parseDoorAddress, parseDoorAddressWithPostalRows, parsePartialDoorAddress } from './door-address.ts';
+import { doorAddressZip, doorLocationQuestion, parseDoorAddress, parseDoorAddressWithPostalRows, parsePartialDoorAddress } from './door-address.ts';
 import { doorBuyerSource, parseBuyerIdentity } from './buyer-input.ts';
 import { parseBuyerAction } from './buyer-action.ts';
 import { geographicZipLookup, postalMatches, zipLookupQuery, zipLookupReply } from './zip-lookup.ts';
@@ -367,6 +367,9 @@ Deno.serve(async (request) => {
     if (partialDoorAddress && directIdentity && /\b(?:add|create|save)\s+(?:a\s+)?buyer\b/i.test(doorSource)) {
       const courier = /\bj\s*(?:&|and|n|\+)\s*t\b|\bjnt\b/i.test(doorSource) ? 'J&T Express' : /\blbc\b/i.test(doorSource) ? 'LBC' : null;
       if (courier && (courier === 'J&T Express' || chosenDelivery === 'door')) {
+        const locationQuestion = doorLocationQuestion(doorSource);
+        if (locationQuestion) return json({ message: locationQuestion }, 200, headers);
+        if (!partialDoorAddress.city) return json({ message: 'Please provide the city and province/region for this address.' }, 200, headers);
         if (!partialDoorAddress.province || !partialDoorAddress.zip_code) await runTool('lookup_zip', { location: partialDoorAddress.city });
         if (verifiedPublic.city && verifiedPublic.city.toLocaleLowerCase() !== partialDoorAddress.city.toLocaleLowerCase()) {
           return json({ message: `I could not verify ${partialDoorAddress.city} as that city or municipality. Please confirm the city name.` }, 200, headers);

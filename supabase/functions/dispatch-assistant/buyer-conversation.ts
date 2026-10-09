@@ -53,6 +53,13 @@ export function conversationBuyer(messages: Message[]): { summary: BuyerSummary 
     }
     if (/^\+?[\d\s().-]+$/.test(text) && /^\d{10,13}$/.test(text.replace(/\D/g, ''))) { summary.phone = text; changed = true; }
     const previous = String(messages[index - 1]?.content ?? '');
+    if (messages[index - 1]?.role === 'assistant' && /Please confirm the barangay, city and province\/region:/.test(previous)) {
+      const places = text.split(/,|\r?\n/).map((part) => part.trim()).filter(Boolean);
+      if (places.length === 3 && places.every((part) => /^[\p{L}][\p{L}. -]*$/u.test(part))) {
+        summary.address = { ...summary.address, barangay: places[0], city: places[1], province: places[2] };
+        changed = true;
+      }
+    }
     if (!summary.name && /(?:provide|send|what).*\bname\b/i.test(previous) && /^[\p{L}][\p{L}.' -]+$/u.test(text) && text.split(/\s+/).length >= 2 && !/\b(?:door|branch|lbc|pickup)\b/i.test(text)) { summary.name = text; changed = true; }
     const method = statedDeliveryMethod(text);
     const deliveryReply = /^(?:use\s+)?(?:lbc\s+)?(?:door(?:\s+to\s+door)?|branch\s*pickup|pickup)[.!]?$/i.test(text) || /^j\s*(?:&|n|and)\s*t(?:\s+express)?(?:\s+door\s+to\s+door)?[.!]?$/i.test(text);

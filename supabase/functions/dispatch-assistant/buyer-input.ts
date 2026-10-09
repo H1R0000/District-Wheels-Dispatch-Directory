@@ -1,7 +1,9 @@
 import { parsePartialDoorAddress } from './door-address.ts';
+import { buyerMessageLines } from './buyer-message-lines.ts';
 
 export function parseBuyerIdentity(message: string) {
-  const lines = String(message ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const lines = buyerMessageLines(message);
+  if (lines.filter((line) => /^\+?[\d\s().-]+$/.test(line) && /^\d{10,13}$/.test(line.replace(/\D/g, ''))).length !== 1) return null;
   const numberIndex = lines.findIndex((line) => /^\+?[\d\s().-]+$/.test(line) && /^\d{10,13}$/.test(line.replace(/\D/g, '')));
   if (numberIndex < 1) return null;
   const name = lines[numberIndex - 1].replace(/^(?:buyer\s*)?name\s*:\s*/i, '').trim();

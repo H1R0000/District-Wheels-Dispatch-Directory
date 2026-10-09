@@ -2,11 +2,52 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buyerRequest, buyerSessionMessages, conversationBuyer, selectedBranch, summaryFields } from '../supabase/functions/dispatch-assistant/buyer-conversation.ts';
 import { parseBuyerIdentity } from '../supabase/functions/dispatch-assistant/buyer-input.ts';
-import { parseDoorAddress } from '../supabase/functions/dispatch-assistant/door-address.ts';
+import { doorLocationQuestion, parseDoorAddress, parsePartialDoorAddress } from '../supabase/functions/dispatch-assistant/door-address.ts';
 import { parsePickupMessage, extractLbcClues } from '../supabase/functions/dispatch-assistant/lbc-resolver.ts';
 import { googleBranchSearchUrl } from '../supabase/functions/dispatch-assistant/branch-search-link.ts';
 const user = (content) => ({ role: 'user', content });
 const initial = user('add buyer\nLBC door to door\nAna Example\n09170008881\n12 Palm St, Brgy. San Juan, Cainta, Rizal 1900');
+
+const inlineDoor = 'add a buyer\nlbc door to door\n\nELVIS EXAMPLE  09170008889  \n\nJADE ST. 112 GREENHEIGHTS SUBDIVISION BRGY. SAN BARTOLOME NOVALICHES\n\nMANILA QUEZON CITY NOVALICHES PROPER\n\nZip code. 1123';
+test('inline name and phone retain multiline street, barangay and labelled ZIP without guessing conflicting localities', () => {
+  assert.deepEqual(parseBuyerIdentity(inlineDoor), { name: 'ELVIS EXAMPLE', phone: '09170008889' });
+  assert.deepEqual(parsePartialDoorAddress(inlineDoor), {
+    street: 'JADE ST. 112 GREENHEIGHTS SUBDIVISION', barangay: 'SAN BARTOLOME NOVALICHES', zip_code: '1123',
+  });
+  const summary = conversationBuyer([user(inlineDoor)]).summary;
+  assert.equal(summary.deliveryMethod, 'door');
+  assert.equal(summary.address.zipCode, '1123');
+  assert.equal(summary.address.city, undefined);
+  assert.equal(buyerRequest(summary), null);
+  assert.match(doorLocationQuestion(inlineDoor), /SAN BARTOLOME NOVALICHES/);
+  assert.match(doorLocationQuestion(inlineDoor), /MANILA QUEZON CITY NOVALICHES PROPER/);
+  assert.equal(parseBuyerIdentity(inlineDoor + '\n09170008890'), null);
+});
+
+test('location clarification completes the same buyer without asking for name, phone or street again', () => {
+  const messages = [user(inlineDoor), { role: 'assistant', content: doorLocationQuestion(inlineDoor) }];
+  const summary = conversationBuyer([...messages, user('San Bartolome, Quezon City, Metro Manila')]).summary;
+  const request = buyerRequest(summary);
+  assert.deepEqual(parseBuyerIdentity(request), { name: 'ELVIS EXAMPLE', phone: '09170008889' });
+  assert.deepEqual(parseDoorAddress(request), {
+    street: 'JADE ST. 112 GREENHEIGHTS SUBDIVISION', barangay: 'San Bartolome', city: 'Quezon City', province: 'Metro Manila', zip_code: '1123',
+  });
+  assert.equal(conversationBuyer([...messages, user('not sure')]).summary.address.city, undefined);
+});
+
+test('inline identity and separate ZIP support clear multiline and comma-separated city/region layouts', () => {
+  for (const courier of ['lbc door to door', 'jnt']) {
+    for (const location of ['Quezon City, Metro Manila', 'Quezon City\nMetro Manila']) {
+      const message = inlineDoor.replace('lbc door to door', courier).replace('MANILA QUEZON CITY NOVALICHES PROPER', location);
+      assert.equal(parseDoorAddress(message).city, 'Quezon City');
+      assert.equal(parseDoorAddress(message).zip_code, '1123');
+      assert.equal(doorLocationQuestion(message), null);
+    }
+  }
+  assert.equal(parsePartialDoorAddress(inlineDoor.replace('lbc door to door', 'lbc branch pickup')), null);
+  const checkout = pastedJnt.replace('Ammiel C Example\n+639170008885', 'Ammiel C Example  +639170008885').replace('3002', 'ZIP: 3002');
+  assert.equal(parseDoorAddress(checkout).zip_code, '3002');
+});
 
 test('labelled pickup with pickuo typo preserves supplied address through corrections', () => {
   const address = "DCC-1 G-16 DANIEL COMM'L CPLX1, NATIONAL HIGHWAY, BRGY, Calamba City";
