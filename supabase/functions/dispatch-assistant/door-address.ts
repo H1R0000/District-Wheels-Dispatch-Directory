@@ -1,5 +1,20 @@
 export type DoorAddress = { street: string; barangay: string; city: string; province: string; zip_code: string };
 
+// Recognize the common pasted checkout layout after the buyer's phone.
+// Keep the full street line: repeated locality text may include a subdivision.
+function multilineDoorAddress(lines: string[]): DoorAddress | null {
+  const phoneIndex = lines.findIndex((line) => /^\+?[\d\s().-]+$/.test(line) && /^\d{10,13}$/.test(line.replace(/\D/g, '')));
+  if (phoneIndex < 0) return null;
+  const address = lines.slice(phoneIndex + 1);
+  if (/^(?:Philippines|PH|Republic of the Philippines)$/i.test(address.at(-1) ?? '')) address.pop();
+  if (address.length !== 5) return null;
+  const [street, barangayLine, city, province, zip_code] = address;
+  const barangay = barangayLine.replace(/^(?:brgy\.?|barangay)\s+/i, '');
+  if (!/^\d{4}$/.test(zip_code) || ![street, barangay, city, province].every((value) => /\p{L}/u.test(value))) return null;
+  if ([barangay, city, province].some((value) => /\b(?:lbc|pickup|door to door|Philippines)\b/i.test(value))) return null;
+  return { street, barangay, city, province, zip_code };
+}
+
 export function doorAddressZip(message: string) {
   const lines = String(message ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   if (!/\b(?:door\s*to\s*door|door\s*delivery|j\s*(?:&|and|n|\+)\s*t|jnt)\b/i.test(message)) return null;
@@ -32,6 +47,8 @@ export function parseDoorAddressWithPostalRows(message: string, rows: Array<{ lo
 export function parsePartialDoorAddress(message: string): Partial<DoorAddress> | null {
   const lines = String(message ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   if (!/\b(?:door\s*to\s*door|door\s*delivery|j\s*(?:&|and|n|\+)\s*t|jnt)\b/i.test(message)) return null;
+  const multiline = multilineDoorAddress(lines);
+  if (multiline) return multiline;
   const line = [...lines].reverse().find((item) => /\b(?:brgy\.?|barangay)\s+/i.test(item));
   if (!line) return null;
   const address = line

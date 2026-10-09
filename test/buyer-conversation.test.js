@@ -6,6 +6,28 @@ import { parseDoorAddress } from '../supabase/functions/dispatch-assistant/door-
 const user = (content) => ({ role: 'user', content });
 const initial = user('add buyer\nLBC door to door\nAna Example\n09170008881\n12 Palm St, Brgy. San Juan, Cainta, Rizal 1900');
 
+const pastedJnt = 'Add a buyer\n\njnt \nAmmiel C Example\n+639170008885\nPurok 4 san isidro matanda hagonoy bulacan\nSan isidro\nHagonoy\nBulacan\n3002\nPhilippines';
+test('pasted JNT checkout details fill every summary and draft address field', () => {
+  const expected = { street: 'Purok 4 san isidro matanda hagonoy bulacan', barangay: 'San isidro', city: 'Hagonoy', province: 'Bulacan', zip_code: '3002' };
+  assert.deepEqual(parseDoorAddress(pastedJnt), expected);
+  assert.deepEqual(parseBuyerIdentity(pastedJnt), { name: 'Ammiel C Example', phone: '+639170008885' });
+  const { summary } = conversationBuyer([user(pastedJnt)]);
+  assert.equal(summary.preferredCourier, 'J&T Express');
+  assert.equal(summary.deliveryMethod, 'door');
+  assert.ok(summaryFields(summary).every(([, value]) => Boolean(value)));
+  assert.deepEqual(parseDoorAddress(buyerRequest(summary)), expected);
+});
+
+test('multiline delivery address tolerates blank lines and optional country without guessing missing fields', () => {
+  const withoutCountry = pastedJnt.replace('\nPhilippines', '');
+  assert.equal(parseDoorAddress(withoutCountry.replaceAll('\n', '\n\n')).zip_code, '3002');
+  assert.equal(parseDoorAddress(withoutCountry.replace('jnt', 'LBC door to door')).barangay, 'San isidro');
+  assert.equal(parseDoorAddress(withoutCountry.replace('\nSan isidro\n', '\n')), null);
+  assert.equal(parseDoorAddress(withoutCountry.replace('\n3002', '')), null);
+  assert.equal(parseDoorAddress(pastedJnt.replace('Philippines', 'Singapore')), null);
+  assert.equal(parseDoorAddress(pastedJnt.replace('jnt', 'LBC branch pickup')), null);
+});
+
 test('phone correction preserves the address and generates a reviewable request', () => {
   const { summary, changed } = conversationBuyer([initial, user('change only the phone number to 09170008882')]);
   assert.equal(changed, true);
