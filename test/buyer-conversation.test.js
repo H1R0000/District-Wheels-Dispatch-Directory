@@ -5,8 +5,100 @@ import { parseBuyerIdentity } from '../supabase/functions/dispatch-assistant/buy
 import { doorLocationQuestion, parseDoorAddress, parsePartialDoorAddress } from '../supabase/functions/dispatch-assistant/door-address.ts';
 import { parsePickupMessage, extractLbcClues } from '../supabase/functions/dispatch-assistant/lbc-resolver.ts';
 import { googleBranchSearchUrl } from '../supabase/functions/dispatch-assistant/branch-search-link.ts';
+import { buyerFollowUp, extractNaturalBuyer } from '../supabase/functions/dispatch-assistant/natural-buyer.ts';
 const user = (content) => ({ role: 'user', content });
 const initial = user('add buyer\nLBC door to door\nAna Example\n09170008881\n12 Palm St, Brgy. San Juan, Cainta, Rizal 1900');
+
+test('natural pickup layouts produce the same buyer draft and private-data-free search', () => {
+  const messages = [
+    'LBC branch pickup, Riz Lawrence Quejada, 09568142493, iMall Canlubang, Calamba, Laguna',
+    'Riz Lawrence Quejada\niMall Canlubang, Calamba City, Laguna\n09568142493\npickup at LBC',
+    '09568142493; LBC COP; iMall Canlubang, Calamba, Laguna; Riz Lawrence Quejada',
+  ];
+  const drafts = messages.map((message) => {
+    const summary = conversationBuyer([user(message)]).summary;
+    assert.equal(buyerFollowUp(summary), null);
+    const draft = parsePickupMessage(buyerRequest(summary));
+    assert.equal(draft.name, 'Riz Lawrence Quejada');
+    assert.equal(draft.phone, '09568142493');
+    assert.equal(draft.branchName, 'iMall Canlubang');
+    const clues = extractLbcClues(message);
+    const query = new URL(googleBranchSearchUrl(clues.name, clues.location)).searchParams.get('q');
+    assert.match(query, /iMall Canlubang/);
+    assert.match(query, /Calamba/);
+    assert.doesNotMatch(query, /Riz|Lawrence|Quejada|09568142493/);
+    return draft;
+  });
+  assert.deepEqual(drafts[0], drafts[1]);
+  assert.deepEqual(drafts[0], drafts[2]);
+});
+
+test('sentence and reordered door messages support courier abbreviations', () => {
+  for (const courier of ['LBC d2d', 'LBC door2door', 'JNT', 'J&T Express', 'J and T']) {
+    for (const message of [
+      `Add buyer Ana Example 09170008881 via ${courier} at 12 Palm St, Brgy. San Juan, Cainta, Rizal 1900`,
+      `${courier}\n12 Palm St, Brgy. San Juan, Cainta, Rizal 1900\n09170008881\nAna Example`,
+    ]) {
+      const summary = conversationBuyer([user(message)]).summary;
+      assert.equal(buyerFollowUp(summary), null, message);
+      assert.equal(summary.name, 'Ana Example');
+      assert.equal(summary.deliveryMethod, 'door');
+      assert.equal(parseDoorAddress(buyerRequest(summary)).street, '12 Palm St');
+    }
+  }
+});
+
+test('missing pickup identity is requested one field at a time and retained through replies', () => {
+  const messages = [user('add buyer, LBC branch pickup, iMall Canlubang, Calamba, Laguna')];
+  let summary = conversationBuyer(messages).summary;
+  assert.equal(buyerFollowUp(summary), "What is the buyer's full name?");
+  messages.push({ role: 'assistant', content: buyerFollowUp(summary) }, user('Ana Example'));
+  summary = conversationBuyer(messages).summary;
+  assert.equal(buyerFollowUp(summary), "What is the buyer's mobile number?");
+  messages.push({ role: 'assistant', content: buyerFollowUp(summary) }, user('09170008881'));
+  summary = conversationBuyer(messages).summary;
+  assert.equal(buyerFollowUp(summary), null);
+  assert.equal(parsePickupMessage(buyerRequest(summary)).branchName, 'iMall Canlubang');
+});
+
+test('missing branch and conflicting delivery choices ask before searching', () => {
+  const messages = [user('add buyer, Ana Example, 09170008881, LBC branch pickup')];
+  let summary = conversationBuyer(messages).summary;
+  assert.equal(buyerFollowUp(summary), 'Which LBC branch and city should I use?');
+  assert.deepEqual(extractLbcClues(messages[0].content), {});
+  messages.push({ role: 'assistant', content: buyerFollowUp(summary) }, user('iMall Canlubang, Calamba, Laguna'));
+  summary = conversationBuyer(messages).summary;
+  assert.equal(parsePickupMessage(buyerRequest(summary)).name, 'Ana Example');
+  const ambiguous = conversationBuyer([user('add buyer, Ana Example, 09170008881, LBC door to door or branch pickup, iMall Canlubang')]).summary;
+  assert.match(buyerFollowUp(ambiguous), /Which delivery/);
+  assert.equal(buyerRequest(ambiguous), null);
+  const twoBranches = extractNaturalBuyer('LBC branch pickup, Ana Example, 09170008881, SM Calamba, iMall Canlubang');
+  assert.equal(twoBranches.branchName, undefined);
+  assert.match(buyerFollowUp(twoBranches), /Which LBC branch/);
+});
+
+test('uncertain person/location spans are excluded from branch queries', () => {
+  const details = extractNaturalBuyer('LBC branch pickup, Ana Example, Ben Example, 09170008881, iMall Canlubang, Calamba');
+  assert.equal(details.name, undefined);
+  assert.equal(buyerFollowUp(details), "What is the buyer's full name?");
+  const query = new URL(googleBranchSearchUrl(details.branchName, details.location)).searchParams.get('q');
+  assert.doesNotMatch(query, /Ana|Ben|09170008881/);
+  assert.equal(extractNaturalBuyer('LBC branch pickup, Ana Example, 09170008881, iMall Canlubang for Ben Example').branchName, undefined);
+  const labelled = extractNaturalBuyer('LBC COP, iMall Canlubang, Calamba, Laguna, Name: Riz, 09170008881');
+  assert.equal(labelled.name, 'Riz');
+  assert.equal(labelled.location, 'Calamba, Laguna');
+});
+
+test('labelled door fields may be reordered and a missing barangay is never invented', () => {
+  const message = 'add buyer; JNT; Name: Ana Example; Phone: 09170008881; Province: Rizal; ZIP: 1900; City: Cainta; Street: 12 Palm St';
+  const summary = conversationBuyer([user(message)]).summary;
+  assert.equal(summary.address.street, '12 Palm St');
+  assert.equal(summary.address.city, 'Cainta');
+  assert.equal(summary.address.barangay, undefined);
+  assert.equal(buyerFollowUp(summary), 'What is the barangay for this delivery?');
+  const completed = conversationBuyer([user(message), { role: 'assistant', content: buyerFollowUp(summary) }, user('San Juan')]).summary;
+  assert.equal(parseDoorAddress(buyerRequest(completed)).barangay, 'San Juan');
+});
 
 const inlineDoor = 'add a buyer\nlbc door to door\n\nELVIS EXAMPLE  09170008889  \n\nJADE ST. 112 GREENHEIGHTS SUBDIVISION BRGY. SAN BARTOLOME NOVALICHES\n\nMANILA QUEZON CITY NOVALICHES PROPER\n\nZip code. 1123';
 test('inline name and phone retain multiline street, barangay and labelled ZIP without guessing conflicting localities', () => {

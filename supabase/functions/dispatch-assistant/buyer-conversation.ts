@@ -2,6 +2,7 @@ import { parseBuyerIdentity } from './buyer-input.ts';
 import { parsePickupMessage } from './lbc-resolver.ts';
 import { parsePartialDoorAddress } from './door-address.ts';
 import { statedDeliveryMethod } from './delivery-method.ts';
+import { extractNaturalBuyer } from './natural-buyer.ts';
 
 type Message = { role?: string; content?: string; completedBuyer?: boolean; branchChoices?: Array<{ branch_name: string; branch_address: string }> };
 export type BuyerSummary = {
@@ -36,10 +37,17 @@ export function conversationBuyer(messages: Message[]): { summary: BuyerSummary 
     const text = String(message.content ?? '').trim();
     const identity = parseBuyerIdentity(text);
     const pickup = parsePickupMessage(text);
-    const starts = newBuyer.test(text) || Boolean(identity && /\b(?:lbc|jnt|j&t)\b/i.test(text)) || Boolean(pickup);
+    const natural = extractNaturalBuyer(/Which LBC branch and city should I use\?/.test(String(messages[index - 1]?.content ?? '')) ? `LBC branch pickup\n${text}` : text);
+    const starts = newBuyer.test(text) || (!summary && Boolean(natural.preferredCourier && (natural.name || natural.phone))) || Boolean(identity && /\b(?:lbc|jnt|j&t)\b/i.test(text)) || Boolean(pickup);
     if (/^(?:edit|update|delete|remove|find)\s+(?:a\s+)?buyer\b/i.test(text)) { summary = null; continue; }
     if (starts) { summary = {}; changed = true; }
     if (!summary) continue;
+    if (starts || /(?:What is|Which LBC|Which delivery)/i.test(String(messages[index - 1]?.content ?? ''))) {
+      const { location, ambiguous, ...fields } = natural;
+      Object.assign(summary, fields, natural.branchName ? { branchName: [natural.branchName, location].filter(Boolean).join(', ') } : {});
+      if (ambiguous) summary.deliveryMethod = undefined;
+      changed = true;
+    }
     if (identity || pickup) { Object.assign(summary, { name: (pickup ?? identity)!.name, phone: (pickup ?? identity)!.phone }); changed = true; }
     if (pickup) { Object.assign(summary, { branchName: [pickup.branchName, pickup.locationHint].filter(Boolean).join(', '), ...(pickup.branchAddress ? { branchAddress: pickup.branchAddress } : {}), deliveryMethod: 'pickup', preferredCourier: 'LBC' }); }
     const fields: Record<string, string> = { name: 'name', phone: 'phone', 'phone number': 'phone', street: 'street', barangay: 'barangay', city: 'city', province: 'province', 'zip code': 'zipCode', zip: 'zipCode', branch: 'branchName', 'branch name': 'branchName', 'branch address': 'branchAddress' };
@@ -61,6 +69,10 @@ export function conversationBuyer(messages: Message[]): { summary: BuyerSummary 
       }
     }
     if (!summary.name && /(?:provide|send|what).*\bname\b/i.test(previous) && /^[\p{L}][\p{L}.' -]+$/u.test(text) && text.split(/\s+/).length >= 2 && !/\b(?:door|branch|lbc|pickup)\b/i.test(text)) { summary.name = text; changed = true; }
+    if (/What is the (?:street or house address|barangay|city or municipality|province or region|ZIP code) for this delivery\?/i.test(previous) && !/[\r\n]/.test(text)) {
+      const field = /street or house/.test(previous) ? 'street' : /barangay/.test(previous) ? 'barangay' : /city or municipality/.test(previous) ? 'city' : /province or region/.test(previous) ? 'province' : 'zipCode';
+      if (text.length <= 180 && (field !== 'zipCode' || /^\d{4}$/.test(text))) { summary.address = { ...summary.address, [field]: text }; changed = true; }
+    }
     const method = statedDeliveryMethod(text);
     const deliveryReply = /^(?:use\s+)?(?:lbc\s+)?(?:door(?:\s+to\s+door)?|branch\s*pickup|pickup)[.!]?$/i.test(text) || /^j\s*(?:&|n|and)\s*t(?:\s+express)?(?:\s+door\s+to\s+door)?[.!]?$/i.test(text);
     if (starts || deliveryReply) {
@@ -68,8 +80,9 @@ export function conversationBuyer(messages: Message[]): { summary: BuyerSummary 
       else if (/\blbc\b/i.test(text)) summary.preferredCourier = 'LBC';
       if (method === 'door' || method === 'pickup') { summary.deliveryMethod = method; changed = true; }
       if (method === 'ambiguous') summary.deliveryMethod = undefined;
+      if (natural.ambiguous) summary.deliveryMethod = undefined;
     }
-    const address = parsePartialDoorAddress(`door to door\n${text}`);
+    const address = natural.address ? Object.fromEntries(Object.entries(natural.address).map(([key, value]) => [key === 'zipCode' ? 'zip_code' : key, value])) : parsePartialDoorAddress(`door to door\n${text}`);
     if (address) {
       summary.address = { ...summary.address, ...Object.fromEntries(Object.entries(address).map(([key, value]) => [key === 'zip_code' ? 'zipCode' : key, value])) };
       changed = true;

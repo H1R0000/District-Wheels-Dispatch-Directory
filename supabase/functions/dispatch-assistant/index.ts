@@ -11,6 +11,7 @@ import { doorBuyerSource, parseBuyerIdentity } from './buyer-input.ts';
 import { parseBuyerAction } from './buyer-action.ts';
 import { geographicZipLookup, postalMatches, zipLookupQuery, zipLookupReply } from './zip-lookup.ts';
 import { buyerRequest, buyerSessionMessages, conversationBuyer, selectedBranch } from './buyer-conversation.ts';
+import { buyerFollowUp } from './natural-buyer.ts';
 
 const tools = [
   { type: 'function', function: { name: 'search_buyers', description: 'Find buyers by name or phone before editing or deleting.', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } } },
@@ -44,7 +45,11 @@ Deno.serve(async (request) => {
     const incoming = buyerSessionMessages(Array.isArray(body.messages) ? body.messages.slice(-40) : []);
     const selection = selectedBranch(incoming);
     const conversation = conversationBuyer(incoming);
-    const followUp = conversation.changed && !/\b(?:add|create|save)\s+(?:a\s+|this\s+)?(?:new\s+)?buyer\b/i.test(String(incoming.at(-1)?.content ?? '')) ? buyerRequest(conversation.summary) : null;
+    const followUp = conversation.changed ? buyerRequest(conversation.summary) : null;
+    if (conversation.changed && conversation.summary && !selection && !followUp) {
+      const question = doorLocationQuestion(String(incoming.at(-1)?.content ?? '')) ?? buyerFollowUp(conversation.summary);
+      if (question) return json({ message: question }, 200, headers);
+    }
     const messages = incoming.map((message: any, index: number) => ({ role: message.role, content: index === incoming.length - 1 ? followUp ?? (selection ? `Find ${selection.branch_name}` : message.content) : message.content }));
     if (!messages.length) return json({ message: 'Send a message first.' }, 400, headers);
     const latest = String(messages.at(-1)?.content ?? '').trim();
@@ -261,7 +266,7 @@ Deno.serve(async (request) => {
       }
       if (name === 'search_lbc_branch') {
         const query = String(args.query ?? '').trim().slice(0, 180);
-        const buyerRequest = /\b(?:add|create|save)\s+(?:a\s+)?buyer\b/i.test(latest);
+        const buyerRequest = Boolean(conversation.summary) || /\b(?:add|create|save)\s+(?:a\s+)?buyer\b/i.test(latest) || /(?:\+?63|0)9\d[\d ().-]{8,}/.test(latest);
         let lookup = buyerRequest ? extractLbcClues(latest) : extractLbcClues(query);
         if (buyerRequest && !lookup.name && !lookup.address) return { error: 'Please provide the LBC branch name or location separately from the buyer details.' };
         if (!lookup.name && !lookup.address) {

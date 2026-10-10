@@ -31,6 +31,21 @@ test('extracts a standalone branch-name lookup', () => {
   assert.deepEqual(extractLbcClues('What is the LBC branch address of Arayat Cubao Quezon City?'), { name: 'Arayat Cubao Quezon City' });
 });
 
+test('natural buyer branch searches keep identity private and return ambiguous official matches', async () => {
+  const clues = extractLbcClues('LBC COP, Ana Example, 09170008881, LBC Arayat');
+  const queries = [];
+  const result = await resolveLbcBranch(clues, async (url) => {
+    queries.push(decodeURIComponent(url));
+    return { ok: true, text: async () => page([arayat, pampanga]) };
+  });
+  assert.equal(result.kind, 'ambiguous');
+  assert.equal(result.branches.length, 2);
+  assert.ok(result.branches.every((branch) => branch.source_url.startsWith('https://www.lbcexpress.com/')));
+  assert.ok(queries.length > 0);
+  assert.ok(queries.every((query) => !/Ana|Example|09170008881/.test(query)));
+  assert.equal((await resolveLbcBranch(clues, async () => { throw new Error('offline'); })).kind, 'unavailable');
+});
+
 test('extracts an inline branch name from an unstructured buyer request', () => {
   assert.deepEqual(extractLbcClues('Add buyer John with LBC Arayat Cubao Quezon City branch pickup'), { name: 'Arayat Cubao Quezon City' });
 });

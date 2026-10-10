@@ -1,4 +1,5 @@
 import { latestDeliveryMethod, statedDeliveryMethod } from './delivery-method.ts';
+import { extractNaturalBuyer } from './natural-buyer.ts';
 
 export type LbcBranch = {
   branch_name: string;
@@ -30,6 +31,14 @@ function locationHint(value: string) {
 }
 
 export function parsePickupMessage(message: string): PickupMessage | null {
+  const legacy = parseLegacyPickupMessage(message);
+  if (legacy) return legacy;
+  const buyer = extractNaturalBuyer(message);
+  if (buyer.ambiguous || buyer.deliveryMethod !== 'pickup' || !buyer.name || !buyer.phone || !buyer.branchName) return null;
+  return { name: buyer.name, phone: buyer.phone, branchName: buyer.branchName, locationHint: buyer.location ?? '', ...(buyer.branchAddress ? { branchAddress: buyer.branchAddress } : {}) };
+}
+
+function parseLegacyPickupMessage(message: string): PickupMessage | null {
   const method = statedDeliveryMethod(message);
   if (method === 'door' || method === 'ambiguous') return null;
   const inputLines = message.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -137,6 +146,10 @@ export function extractLbcClues(message: string): Clues {
   if (name || address) return { name: name && clean(name), address: address && clean(address) };
   const pickup = parsePickupMessage(message);
   if (pickup) return { name: pickup.branchName, location: pickup.locationHint };
+  if (/(?:\+?63|0)9\d[\d ().-]{8,}/.test(message)) {
+    const natural = extractNaturalBuyer(message);
+    return natural.branchName ? { name: natural.branchName, location: natural.location } : {};
+  }
   const inlineName = message.match(/\blbc(?:\s+express)?\s+(.+?)\s+branch\s+pickup\b/i)?.[1]
     ?? message.match(/\blbc\s+branch\s+pickup[ \t]+(?:at[ \t]+|in[ \t]+|from[ \t]+)?([^\n,]+)/i)?.[1];
   if (inlineName) return { name: clean(inlineName) };
@@ -207,6 +220,7 @@ function score(entry: LbcBranch, clues: Clues) {
     if (name === branchName) points += 140;
     else if (name.startsWith(`${branchName} `)) points += 100;
     else if (name.includes(branchName)) points += 80;
+    else if (branchName.startsWith(`${name} `)) points += 70;
     for (const token of new Set(name.split(' ').filter((word) => word.length > 2))) {
       if (branchName.split(' ').includes(token)) points += 9;
       else if (branchAddress.split(' ').includes(token)) points += 5;
@@ -238,6 +252,7 @@ export async function resolveLbcBranch(
 ): Promise<LbcResolution> {
   if (!clues.name && !clues.address) return { kind: 'not_found' };
   const found = new Map<string, LbcBranch>();
+  const broadName = Boolean(clues.name && plain(clues.name).split(' ').length === 1 && !clues.location && !clues.address);
   let successfulPage = false;
   const deadline = Date.now() + 18000;
   for (const term of searchTerms(clues)) {
@@ -256,11 +271,12 @@ export async function resolveLbcBranch(
       }
     } catch { /* try the next official search term */ }
     const ranked = [...found.values()].map((branch) => ({ branch, points: score(branch, clues) })).sort((a, b) => b.points - a.points);
-    if (ranked[0]?.points >= 100 && (!ranked[1] || ranked[0].points - ranked[1].points >= 30) && !(clues.name && clues.address)) {
+    if (!broadName && ranked[0]?.points >= 100 && (!ranked[1] || ranked[0].points - ranked[1].points >= 30) && !(clues.name && clues.address)) {
       return { kind: 'match', branch: ranked[0].branch };
     }
   }
   const ranked = [...found.values()].map((branch) => ({ branch, points: score(branch, clues) })).filter(({ points }) => points >= 25).sort((a, b) => b.points - a.points);
+  if (broadName && ranked.length > 1) return { kind: 'ambiguous', branches: ranked.slice(0, 4).map(({ branch }) => branch) };
   if (!ranked.length) {
     const recent = (options.cachedBranches ?? []).filter((branch) => {
       const age = Date.now() - Date.parse(branch.verified_at ?? '');
@@ -269,6 +285,7 @@ export async function resolveLbcBranch(
     const cached = recent.map((branch) => ({ branch, points: score(branch, clues) }))
       .filter(({ points }) => points >= 25).sort((a, b) => b.points - a.points);
     const cachedTop = cached[0];
+    if (broadName && cached.length > 1) return { kind: 'ambiguous', branches: cached.slice(0, 4).map(({ branch }) => branch) };
     const cachedFitsBoth = !clues.name || !clues.address || Boolean(cachedTop &&
       score(cachedTop.branch, { name: clues.name }) >= 80 && score(cachedTop.branch, { address: clues.address }) >= 80
     );
