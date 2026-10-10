@@ -12,6 +12,7 @@ import { parseBuyerAction } from './buyer-action.ts';
 import { geographicZipLookup, postalMatches, zipLookupQuery, zipLookupReply } from './zip-lookup.ts';
 import { buyerRequest, buyerSessionMessages, conversationBuyer, selectedBranch } from './buyer-conversation.ts';
 import { buyerFollowUp } from './natural-buyer.ts';
+import { claimsReviewForm, isReviewRequest } from './review-handoff.ts';
 
 const tools = [
   { type: 'function', function: { name: 'search_buyers', description: 'Find buyers by name or phone before editing or deleting.', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } } },
@@ -45,6 +46,8 @@ Deno.serve(async (request) => {
     const incoming = buyerSessionMessages(Array.isArray(body.messages) ? body.messages.slice(-40) : []);
     const selection = selectedBranch(incoming);
     const conversation = conversationBuyer(incoming);
+    const reviewRequested = isReviewRequest(String(incoming.at(-1)?.content ?? ''));
+    if (reviewRequested && conversation.summary) conversation.changed = true;
     const followUp = conversation.changed ? buyerRequest(conversation.summary) : null;
     if (conversation.changed && conversation.summary && !selection && !followUp) {
       const question = doorLocationQuestion(String(incoming.at(-1)?.content ?? '')) ?? buyerFollowUp(conversation.summary);
@@ -349,7 +352,7 @@ Deno.serve(async (request) => {
     function addBuyerResponse(outcome: any) {
       if (outcome.error) return json({ message: outcome.error, existingBuyerId: outcome.existingBuyerId }, 200, headers);
       return json({
-        message: `Review ${outcome.draft.name}'s details in the form before saving.${publicSourceUrl && outcome.draft.deliveryMethod === 'door' ? ` I checked the public city, province, and ZIP against ${publicSourceUrl.includes('phlpost.gov.ph') ? 'PHLPost' : 'the linked geographic source'}.` : ''}`,
+        message: `Click Open review form to check ${outcome.draft.name}'s details, then click Create buyer to save.${publicSourceUrl && outcome.draft.deliveryMethod === 'door' ? ` I checked the public city, province, and ZIP against ${publicSourceUrl.includes('phlpost.gov.ph') ? 'PHLPost' : 'the linked geographic source'}.` : ''}`,
         draft: outcome.draft,
         sourceUrl: resolvedPickup?.source_url ?? publicSourceUrl,
       }, 200, headers);
@@ -418,6 +421,7 @@ Deno.serve(async (request) => {
       return json({ message: zipLookupReply(result, zipQuery), sourceUrl: result[0]?.source_url ?? publicSourceUrl ?? null }, 200, headers);
     }
     if (!apiKey) return json({ message: 'The assistant has not been configured yet.' }, 503, headers);
+    let requireDraftTool = reviewRequested;
     for (let step = 0; step < 4; step++) {
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'qwen/qwen3.8-27b', messages: history, tools, tool_choice: 'auto', temperature: 0.1, max_completion_tokens: 700 }), signal: AbortSignal.timeout(25000) });
       if (response.status === 429) {
@@ -430,7 +434,17 @@ Deno.serve(async (request) => {
         return json({ message: 'The AI service could not process that request. Please try again.', code: 'ai_service_error' }, 502, headers);
       }
       const result = await response.json(); const message = result.choices?.[0]?.message;
-      if (!message?.tool_calls?.length) return json({ message: message?.content || 'I could not complete that request.', googleSearchUrl: lastBranchGoogleUrl }, 200, headers);
+      if (!message?.tool_calls?.length) {
+        if (requireDraftTool || claimsReviewForm(String(message?.content ?? ''))) {
+          if (!requireDraftTool) {
+            requireDraftTool = true;
+            history.push({ role: 'system', content: 'No review form exists yet. Call add_buyer or edit_buyer to prepare the structured form using supplied details. If information is missing, ask one specific question. Do not describe a draft as ready or direct the user to save without a successful tool result.' });
+            continue;
+          }
+          return json({ message: 'I have not prepared a review form yet. Please send the missing buyer or delivery details, or click Prepare review form to retry.', prepareReview: true }, 200, headers);
+        }
+        return json({ message: message?.content || 'I could not complete that request.', googleSearchUrl: lastBranchGoogleUrl }, 200, headers);
+      }
       history.push(message);
       for (const call of message.tool_calls) {
         let args = {}; try { args = JSON.parse(call.function.arguments); } catch { /* validated by tool */ }

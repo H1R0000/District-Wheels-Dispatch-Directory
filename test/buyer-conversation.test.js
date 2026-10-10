@@ -6,8 +6,23 @@ import { doorLocationQuestion, parseDoorAddress, parsePartialDoorAddress } from 
 import { parsePickupMessage, extractLbcClues } from '../supabase/functions/dispatch-assistant/lbc-resolver.ts';
 import { googleBranchSearchUrl } from '../supabase/functions/dispatch-assistant/branch-search-link.ts';
 import { buyerFollowUp, extractNaturalBuyer } from '../supabase/functions/dispatch-assistant/natural-buyer.ts';
+import { availableReviewMessage, claimsReviewForm, isReviewRequest } from '../supabase/functions/dispatch-assistant/review-handoff.ts';
 const user = (content) => ({ role: 'user', content });
 const initial = user('add buyer\nLBC door to door\nAna Example\n09170008881\n12 Palm St, Brgy. San Juan, Cainta, Rizal 1900');
+
+test('review action survives save questions but never reopens a stale or saved draft', () => {
+  const draft = { role: 'assistant', content: 'Review the form.', draft: { name: 'Ana Example' } };
+  for (const text of ['save', 'save it', 'where is the save button?', 'Review buyer form', 'yes']) {
+    assert.equal(isReviewRequest(text), true);
+    assert.equal(availableReviewMessage([initial, draft, user(text), { role: 'assistant', content: 'Open the form.' }]), draft);
+  }
+  assert.equal(availableReviewMessage([draft, user('Change phone to 09170008888')]), undefined);
+  assert.equal(availableReviewMessage([draft, { role: 'assistant', completedBuyer: true, content: 'Saved' }]), undefined);
+  assert.equal(availableReviewMessage([draft, user('add buyer')]), undefined);
+  assert.equal(availableReviewMessage([{ role: 'assistant', content: "Here's the draft ready for your review. Please click Save in the form." }]), undefined);
+  assert.equal(claimsReviewForm("Here's the draft ready for your review. Please click Save in the form."), true);
+  assert.equal(claimsReviewForm('What is the buyer name?'), false);
+});
 
 test('natural pickup layouts produce the same buyer draft and private-data-free search', () => {
   const messages = [

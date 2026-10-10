@@ -6,6 +6,7 @@ import { useAppAuth } from '../lib/AuthContext.jsx';
 import { draftMethodConflict } from '../utils/assistantDraft.js';
 import { insertPromptTemplate, resizeComposer, shouldSendOnEnter, suggestedPrompts } from '../utils/assistantComposer.js';
 import { buyerSessionMessages, conversationBuyer, summaryFields } from '../../../supabase/functions/dispatch-assistant/buyer-conversation.ts';
+import { availableReviewMessage, claimsReviewForm, isReviewRequest } from '../../../supabase/functions/dispatch-assistant/review-handoff.ts';
 
 const welcomeMessage = { id: 'welcome', role: 'assistant', content: 'Paste a buyer’s details here, even if they are just a few lines. I’ll ask whether LBC delivery is Door to door or Branch pickup when needed, then prepare a form for you to review. You can also ask me to edit a buyer or look up an LBC branch or ZIP code.' };
 
@@ -81,7 +82,9 @@ function AssistantSession({ userId }) {
   const messagesRef = useRef(null);
   const panelRef = useRef(null);
   const requestVersion = useRef(0);
-  const currentDraft = messages.at(-1)?.draft;
+  const reviewMessage = availableReviewMessage(messages);
+  const currentDraft = reviewMessage?.draft;
+  const canPrepareReview = messages.at(-1)?.role === 'assistant' && (messages.at(-1)?.prepareReview || claimsReviewForm(messages.at(-1)?.content ?? ''));
   const buyerSummary = currentDraft ?? conversationBuyer(buyerSessionMessages(messages)).summary;
 
   useEffect(() => () => { requestVersion.current += 1; }, []);
@@ -169,10 +172,9 @@ function AssistantSession({ userId }) {
   async function submitMessage(content) {
     content = content.trim();
     if (!content || busy) return;
-    const previous = messages.at(-1);
-    if (/^(?:correct|yes|confirm|review|looks good)[.!]?$/i.test(content) && (previous?.draft || previous?.editDraft)) {
+    if (isReviewRequest(content) && reviewMessage) {
       setValue('');
-      reviewDraft(previous);
+      reviewDraft(reviewMessage);
       return;
     }
     const version = ++requestVersion.current;
@@ -192,7 +194,7 @@ function AssistantSession({ userId }) {
           return;
         }
       }
-      setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', content: data?.message || 'I could not complete that request.', existingBuyerId: data?.existingBuyerId, googleSearchUrl: safeGoogleSearchUrl(data?.googleSearchUrl), sourceUrl: safeSourceUrl(data?.sourceUrl), branchChoices: data?.branchChoices, draft: data?.draft, editDraft: data?.editDraft }]);
+      setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', content: data?.message || 'I could not complete that request.', prepareReview: data?.prepareReview, existingBuyerId: data?.existingBuyerId, googleSearchUrl: safeGoogleSearchUrl(data?.googleSearchUrl), sourceUrl: safeSourceUrl(data?.sourceUrl), branchChoices: data?.branchChoices, draft: data?.draft, editDraft: data?.editDraft }]);
     } catch (error) {
       const message = await assistantErrorMessage(error);
       if (version !== requestVersion.current) return;
@@ -269,10 +271,13 @@ function AssistantSession({ userId }) {
             <dt>{label}</dt><dd><button type="button" disabled={busy} aria-label={`Change ${label.toLowerCase()}: ${detail || 'missing'}`} className={!detail ? 'is-missing' : ''} onClick={() => { if (field === 'courier' || field === 'delivery') setChoosingDelivery(true); else { setValue(`Change ${field} to `); inputRef.current?.focus(); } }}>{detail || 'Missing — add detail'}</button></dd>
           </div>)}</dl>
           {(!buyerSummary.deliveryMethod || choosingDelivery) && <div className="assistant-delivery-options">{['LBC door to door', 'LBC branch pickup', 'J&T Express door to door'].map((choice) => <button key={choice} type="button" disabled={busy} onClick={() => { setChoosingDelivery(false); submitMessage(choice); }}>{choice}</button>)}</div>}
-          {currentDraft && <button className="assistant-result-link" type="button" disabled={busy} onClick={() => reviewDraft(messages.at(-1))}>Review and edit form</button>}
         </section>}
       </div>
       <form className="assistant-composer" onSubmit={send}>
+        {(reviewMessage || canPrepareReview) && <div className="assistant-review-action">
+          <button className="button button-primary" type="button" disabled={busy} onClick={() => reviewMessage ? reviewDraft(reviewMessage) : submitMessage('Review buyer form')}>{reviewMessage ? 'Open review form' : 'Prepare review form'}</button>
+          <small>{reviewMessage?.editDraft ? 'Review the form, then click Save changes.' : 'Review the form, then click Create buyer to save.'}</small>
+        </div>}
         <div className="assistant-prompt-list" role="group" aria-label="Suggested messages">
           {suggestedPrompts.map(({ label, template }) => <button key={label} className="assistant-prompt" type="button" onClick={() => selectPrompt(template)}>{label}</button>)}
         </div>
