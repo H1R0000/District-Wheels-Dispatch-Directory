@@ -44,7 +44,7 @@ are not claimed.
 
 ## Validation
 
-The integrated `npm test` run passed 124 tests, and `npm run build` passed.
+The integrated `npm test` run passed 125 tests, and `npm run build` passed.
 Focused security review confirmed that the reproduced buyer/branch identity swaps
 are rejected, including uncertain first messages. Resolver calls and Google links
 also check destination clues for buyer identity and phone information.
@@ -54,7 +54,18 @@ and resets; stale response/revision handling; evidence validation; provider fail
 correction-to-canonical-draft integration; and branch-query privacy. The existing
 Vite bundle-size warning remains.
 
-Live verification and release are in progress. Signing uses an existing server
-secret without exposing it. Tokens expire after 24 hours; persistence is limited
-to the current browser session. If signing configuration is unavailable, responses
-explicitly use the existing stateless conversation fallback.
+Released to GitHub, Supabase, and Vercel. Live demo verification covered an unfamiliar
+mixed English/Tagalog buyer message, an informal phone correction, an unrelated ZIP
+question, refresh persistence, and opening the populated review form. Starting another
+buyer also cleared the prior door address and produced a sourced iMall Canlubang pickup
+draft; its Google link contained only the branch and location. The live phone
+correction exposed a name-classification issue; a regression now covers that complete
+sequence and the corrected backend was deployed and rechecked. No test buyer was saved.
+
+Signing uses an existing server secret without exposing it. Tokens expire after 24
+hours; persistence is limited to the current browser session. If signing configuration
+is unavailable, responses explicitly use the existing stateless conversation fallback.
+Live verification used the demo account. Cross-device persistence and a production
+owner-account save were not tested as part of this change.
+
+![Verified pickup draft and visible review action](screenshots/assistant-persistent-draft-2026-10-14.png)
