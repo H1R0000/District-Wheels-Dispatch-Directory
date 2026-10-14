@@ -2,8 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { cors, json } from '../_shared/http.ts';
 import { confirmedBranchClues, confirmedBranchForBuyerReply, extractLbcClues, parsePickupAddressFollowUp, parsePickupConfirmation, parsePickupMessage, resolveLbcBranch, searchTerms, type LbcBranch } from './lbc-resolver.ts';
 import { draftEvidenceError } from './draft-evidence.ts';
-import { chooseDeliveryMethod } from './delivery-method.ts';
-import { googleBranchSearchUrl } from './branch-search-link.ts';
+import { chooseDeliveryMethod, statedDeliveryMethod } from './delivery-method.ts';
+import { googleBranchSearchUrl as branchSearchUrl } from './branch-search-link.ts';
 import { buyerChoicesMessage, selectBuyer } from './buyer-selection.ts';
 import { editEvidenceError } from './edit-evidence.ts';
 import { doorAddressZip, doorLocationQuestion, parseDoorAddress, parseDoorAddressWithPostalRows, parsePartialDoorAddress } from './door-address.ts';
@@ -12,6 +12,8 @@ import { parseBuyerAction } from './buyer-action.ts';
 import { geographicZipLookup, postalMatches, zipLookupQuery, zipLookupReply } from './zip-lookup.ts';
 import { buyerRequest, buyerSessionMessages, conversationBuyer, selectedBranch } from './buyer-conversation.ts';
 import { buyerFollowUp } from './natural-buyer.ts';
+import { cleanBuyer, mergeBuyer, newBuyerMessage, readBuyerState, sealBuyerState, type BuyerState } from './buyer-state.ts';
+import { buyerMutationMessage, extractBuyerWithAI, privateBranchClue, validateBuyerChange } from './ai-extraction.ts';
 import { claimsReviewForm, isReviewRequest } from './review-handoff.ts';
 
 const tools = [
@@ -44,27 +46,58 @@ Deno.serve(async (request) => {
     const apiKey = Deno.env.get('GROQ_API_KEY');
     const body = await request.json();
     const incoming = buyerSessionMessages(Array.isArray(body.messages) ? body.messages.slice(-40) : []);
+    const latestInput = String(incoming.at(-1)?.content ?? '').trim();
+    const stateSecret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const resetsBuyer = newBuyerMessage(latestInput);
+    let state: BuyerState | null = resetsBuyer ? null : await readBuyerState(body.buyerStateToken, auth.user.id, stateSecret);
     const selection = selectedBranch(incoming);
-    const conversation = conversationBuyer(incoming);
+    const conversation = conversationBuyer(state ? incoming.slice(-2) : incoming, state?.buyer ?? null);
+    if (!conversation.summary && resetsBuyer) { conversation.summary = {}; conversation.changed = true; }
+    if (conversation.summary) {
+      const evidence = state ? latestInput : incoming.filter((item: any) => item.role === 'user').map((item: any) => String(item.content ?? '')).join('\n');
+      const accepted = validateBuyerChange(conversation.summary, evidence, state?.buyer ?? {});
+      conversation.summary = mergeBuyer(state?.buyer ?? {}, accepted);
+      conversation.changed = Boolean(Object.keys(accepted).length) || resetsBuyer;
+    }
+    if (state && !buyerMutationMessage(latestInput)) { conversation.summary = state.buyer; conversation.changed = false; }
+    if (conversation.summary && buyerMutationMessage(latestInput) && (!conversation.changed || buyerFollowUp(conversation.summary))) {
+      const extracted = await extractBuyerWithAI(latestInput, conversation.summary, apiKey);
+      if (Object.keys(extracted).length) { conversation.summary = mergeBuyer(conversation.summary, extracted); conversation.changed = true; }
+    }
+    if (conversation.summary && statedDeliveryMethod(latestInput) === 'ambiguous') {
+      delete conversation.summary.deliveryMethod;
+      conversation.changed = true;
+    }
+    if (conversation.summary) state = { version: 1, id: state?.id ?? crypto.randomUUID(), revision: (state?.revision ?? 0) + (conversation.changed ? 1 : 0), buyer: cleanBuyer(conversation.summary), status: !conversation.changed && state?.status === 'ready' ? 'ready' : 'collecting' };
+    else state = null;
+    async function reply(payload: any, status = 200, responseHeaders = headers) {
+      if (!state) return json(payload, status, responseHeaders);
+      if (payload.draft) { state.buyer = mergeBuyer(state.buyer, payload.draft); state.status = 'ready'; }
+      return json({ ...payload, buyerState: state, buyerStateToken: await sealBuyerState(state, auth.user.id, stateSecret), ...(!stateSecret ? { statePersistence: 'stateless' } : {}) }, status, responseHeaders);
+    }
+    const branchIdentities = () => [state?.buyer.name, conversation.summary?.name, ...incoming.filter((item: any) => item.role === 'user').map((item: any) => parseBuyerIdentity(String(item.content ?? ''))?.name)];
+    function googleBranchSearchUrl(name?: string, location?: string) {
+      return privateBranchClue({ name, location }, branchIdentities()) ? null : branchSearchUrl(name, location);
+    }
     const reviewRequested = isReviewRequest(String(incoming.at(-1)?.content ?? ''));
     if (reviewRequested && conversation.summary) conversation.changed = true;
     const followUp = conversation.changed ? buyerRequest(conversation.summary) : null;
     if (conversation.changed && conversation.summary && !selection && !followUp) {
       const question = doorLocationQuestion(String(incoming.at(-1)?.content ?? '')) ?? buyerFollowUp(conversation.summary);
-      if (question) return json({ message: question }, 200, headers);
+      if (question) return reply({ message: question }, 200, headers);
     }
     const messages = incoming.map((message: any, index: number) => ({ role: message.role, content: index === incoming.length - 1 ? followUp ?? (selection ? `Find ${selection.branch_name}` : message.content) : message.content }));
-    if (!messages.length) return json({ message: 'Send a message first.' }, 400, headers);
+    if (!messages.length) return reply({ message: 'Send a message first.' }, 400, headers);
     const latest = String(messages.at(-1)?.content ?? '').trim();
     const confirmation = latest.match(/^DELETE\s+([A-F0-9]{8})$/i);
     if (confirmation) {
       const { data, error } = await db.rpc('confirm_buyer_deletion', { confirmation_code: confirmation[1] });
-      if (error || !data?.name) return json({ message: 'That deletion confirmation is invalid or expired. Ask me to delete the buyer again.' }, 200, headers);
+      if (error || !data?.name) return reply({ message: 'That deletion confirmation is invalid or expired. Ask me to delete the buyer again.' }, 200, headers);
       const destination = data.destination;
       const details = destination?.branch_name
         ? `LBC branch pickup — ${destination.branch_name}, ${destination.branch_address}`
         : destination ? `${data.courier ?? 'Door delivery'} door to door — ${[destination.street, destination.barangay, destination.city, destination.province, destination.zip_code].filter(Boolean).join(', ')}` : '';
-      return json({ message: `Deleted ${data.name} (${data.phone}).${details ? `\n${details}` : ''}`, deletedBuyer: { name: data.name, phone: data.phone } }, 200, headers);
+      return reply({ message: `Deleted ${data.name} (${data.phone}).${details ? `\n${details}` : ''}`, deletedBuyer: { name: data.name, phone: data.phone } }, 200, headers);
     }
     const userMessages = messages.filter((message: any) => message?.role === 'user').map((message: any) => String(message.content ?? ''));
     const userText = userMessages.join('\n');
@@ -87,6 +120,7 @@ Deno.serve(async (request) => {
     }
 
     async function findLbcBranch(lookup: { name?: string; address?: string; location?: string }) {
+      if (privateBranchClue(lookup, branchIdentities())) return { kind: 'not_found' as const };
       const cached = new Map<string, LbcBranch>();
       const terms = searchTerms(lookup).map((term) => term.replace(/[%_,()]/g, '').trim()).filter(Boolean).slice(0, 2);
       for (const term of terms) {
@@ -117,10 +151,10 @@ Deno.serve(async (request) => {
     const confirmationClues = confirmedBranchClues(messages);
     if (confirmationClues) {
       const resolution = await findLbcBranch(confirmationClues);
-      if (resolution.kind === 'ambiguous') return json({ message: 'Several LBC branches match. Choose the exact one below.', branchChoices: resolution.branches, googleSearchUrl: googleBranchSearchUrl(confirmationClues.name, confirmationClues.location) }, 200, headers);
-      if (resolution.kind !== 'match') return json({ message: 'I could not verify that LBC branch right now. Please check its name and address before using it for pickup.', googleSearchUrl: googleBranchSearchUrl(confirmationClues.name, confirmationClues.location) }, 200, headers);
+      if (resolution.kind === 'ambiguous') return reply({ message: 'Several LBC branches match. Choose the exact one below.', branchChoices: resolution.branches, googleSearchUrl: googleBranchSearchUrl(confirmationClues.name, confirmationClues.location) }, 200, headers);
+      if (resolution.kind !== 'match') return reply({ message: 'I could not verify that LBC branch right now. Please check its name and address before using it for pickup.', googleSearchUrl: googleBranchSearchUrl(confirmationClues.name, confirmationClues.location) }, 200, headers);
       const shownBranchName = String(messages.at(-2)?.content ?? '').split(/\r?\n/)[0].trim();
-      if (resolution.branch.branch_name !== shownBranchName) return json({ message: 'The branch result changed. Please look it up again before confirming it.' }, 200, headers);
+      if (resolution.branch.branch_name !== shownBranchName) return reply({ message: 'The branch result changed. Please look it up again before confirming it.' }, 200, headers);
       confirmedBranch = resolution.branch;
       const priorRequest = messages.slice(-7, -1).reverse().find((message: any) => message?.role === 'user' && parsePickupMessage(String(message.content ?? '')));
       const priorPickup = priorRequest && parsePickupMessage(String(priorRequest.content ?? ''));
@@ -128,35 +162,35 @@ Deno.serve(async (request) => {
         const priorResolution = await findLbcBranch({ name: priorPickup.branchName, location: priorPickup.locationHint });
         if (priorResolution.kind === 'match' && priorResolution.branch.branch_name === confirmedBranch.branch_name && priorResolution.branch.branch_address === confirmedBranch.branch_address) parsedPickup = priorPickup;
       }
-      if (!parsedPickup) return json({ message: `Confirmed ${confirmedBranch.branch_name}.\n${confirmedBranch.branch_address}\n${lbcSource(confirmedBranch)}\nSend the buyer's name and phone number to prepare the pickup form.`, sourceUrl: confirmedBranch.source_url, googleSearchUrl: googleBranchSearchUrl(confirmationClues.name, confirmationClues.location) }, 200, headers);
+      if (!parsedPickup) return reply({ message: `Confirmed ${confirmedBranch.branch_name}.\n${confirmedBranch.branch_address}\n${lbcSource(confirmedBranch)}\nSend the buyer's name and phone number to prepare the pickup form.`, sourceUrl: confirmedBranch.source_url, googleSearchUrl: googleBranchSearchUrl(confirmationClues.name, confirmationClues.location) }, 200, headers);
     }
     const confirmedNameForReply = confirmedBranchForBuyerReply(messages);
     const buyerReply = confirmedNameForReply && parseBuyerIdentity(latest);
     if (buyerReply) {
       const resolution = await findLbcBranch({ name: confirmedNameForReply });
-      if (resolution.kind !== 'match' || resolution.branch.branch_name !== confirmedNameForReply) return json({ message: 'I could not verify the confirmed branch again. Please look it up before preparing this buyer.' }, 200, headers);
+      if (resolution.kind !== 'match' || resolution.branch.branch_name !== confirmedNameForReply) return reply({ message: 'I could not verify the confirmed branch again. Please look it up before preparing this buyer.' }, 200, headers);
       confirmedBranch = resolution.branch;
       parsedPickup = { ...buyerReply, branchName: confirmedBranch.branch_name, locationHint: '' };
     }
 
     const pastedPickup = confirmedBranch && parsedPickup ? parsedPickup : deliveryChoice === 'pickup' ? parsedPickup : null;
     if (deliveryChoice === 'ambiguous' && /\b(?:add|create|save)\b[\s\S]*\bbuyer\b/i.test(latest)) {
-      return json({ message: 'For this LBC buyer, choose Door to door or Branch pickup before I prepare the form.' }, 200, headers);
+      return reply({ message: 'For this LBC buyer, choose Door to door or Branch pickup before I prepare the form.' }, 200, headers);
     }
     if (!deliveryChoice && /\b(?:add|create|save)\s+(?:a\s+)?(?:new\s+)?(?:lbc\s+)?buyer\b/i.test(latest) && /\blbc\b/i.test(latest)) {
-      return json({ message: 'For this LBC buyer, is delivery Door to door or Branch pickup?' }, 200, headers);
+      return reply({ message: 'For this LBC buyer, is delivery Door to door or Branch pickup?' }, 200, headers);
     }
     if (pastedPickup) {
       const { data: existing, error: duplicateError } = await db.from('buyers')
         .select('id,name').eq('phone', pastedPickup.phone).maybeSingle();
-      if (duplicateError) return json({ message: 'I could not check for an existing buyer. Please try again.' }, 500, headers);
-      if (existing) return json({
+      if (duplicateError) return reply({ message: 'I could not check for an existing buyer. Please try again.' }, 500, headers);
+      if (existing) return reply({
         message: `${existing.name} already uses this phone number. Open that buyer to review or add another pickup location.`,
         existingBuyerId: existing.id,
       }, 200, headers);
 
       const resolution = confirmedBranch ? { kind: 'match' as const, branch: confirmedBranch } : await findLbcBranch({ name: pastedPickup.branchName, address: pastedPickup.branchAddress, location: pastedPickup.locationHint });
-      if (resolution.kind === 'ambiguous') return json({
+      if (resolution.kind === 'ambiguous') return reply({
         message: 'Several LBC branches match. Choose the exact branch below.',
         branchChoices: resolution.branches,
         googleSearchUrl: googleBranchSearchUrl(pastedPickup.branchName, pastedPickup.locationHint),
@@ -176,7 +210,7 @@ Deno.serve(async (request) => {
             ? 'I filled in the address you provided, but could not verify the LBC branch. Review it before saving.'
             : 'I filled in the buyer details, but could not verify the LBC branch. Enter its complete address before saving.';
       const googleSearchUrl = googleBranchSearchUrl(pastedPickup.branchName, pastedPickup.locationHint);
-      return json({ message: notice, draft, sourceUrl: verified?.source_url ?? null, googleSearchUrl }, 200, headers);
+      return reply({ message: notice, draft, sourceUrl: verified?.source_url ?? null, googleSearchUrl }, 200, headers);
     }
 
     let resolvedPickup: LbcBranch | null = null;
@@ -194,20 +228,20 @@ Deno.serve(async (request) => {
         verifiedPickupPairs.add(pickupPair(resolvedPickup));
         history[0].content += ` The official LBC directory verifies this branch pair: name "${resolvedPickup.branch_name}", address "${resolvedPickup.branch_address}", source ${resolvedPickup.source_url}. Use both fields when adding an LBC pickup buyer. Never ask the user for the other field.`;
         if (standaloneBranchLookup) {
-          return json({ message: `${resolvedPickup.branch_name}\n${resolvedPickup.branch_address}\n${lbcSource(resolvedPickup)}`, sourceUrl: resolvedPickup.source_url, googleSearchUrl: googleBranchSearchUrl(resolvedPickup.branch_name) }, 200, headers);
+          return reply({ message: `${resolvedPickup.branch_name}\n${resolvedPickup.branch_address}\n${lbcSource(resolvedPickup)}`, sourceUrl: resolvedPickup.source_url, googleSearchUrl: googleBranchSearchUrl(resolvedPickup.branch_name) }, 200, headers);
         }
       } else if (resolution.kind === 'ambiguous') {
-        return json({ message: 'I found more than one LBC branch. Choose the exact branch below.', branchChoices: resolution.branches, googleSearchUrl: googleBranchSearchUrl(clues.name, clues.location) }, 200, headers);
+        return reply({ message: 'I found more than one LBC branch. Choose the exact branch below.', branchChoices: resolution.branches, googleSearchUrl: googleBranchSearchUrl(clues.name, clues.location) }, 200, headers);
       } else if (resolution.kind === 'unavailable') {
-        return json({ message: 'The official LBC directory is unavailable right now. You can check Google and paste the branch name and address here for review.', googleSearchUrl: googleBranchSearchUrl(clues.name, clues.location) }, 200, headers);
+        return reply({ message: 'The official LBC directory is unavailable right now. You can check Google and paste the branch name and address here for review.', googleSearchUrl: googleBranchSearchUrl(clues.name, clues.location) }, 200, headers);
       } else {
-        return json({ message: 'I could not verify that LBC branch in the official directory. You can check Google and paste the branch name and address here for review.', googleSearchUrl: googleBranchSearchUrl(clues.name, clues.location) }, 200, headers);
+        return reply({ message: 'I could not verify that LBC branch in the official directory. You can check Google and paste the branch name and address here for review.', googleSearchUrl: googleBranchSearchUrl(clues.name, clues.location) }, 200, headers);
       }
     }
     const suppliedPhoneNumbers = (userText.match(/(?:\+?\d[\d \t().-]{5,24}\d)/g) ?? []).map(phone).filter((value) => value.length >= 7 && value.length <= 15);
     if (/\badd\s+(?:a\s+)?buyer\b/i.test(latest) && !suppliedPhoneNumbers.length) {
       const branchNote = resolvedPickup ? `I found the LBC branch: ${resolvedPickup.branch_name} — ${resolvedPickup.branch_address}\nSource: ${resolvedPickup.source_url}\n\n` : '';
-      return json({ message: `${branchNote}Please provide the buyer's phone number before I add the record.` }, 200, headers);
+      return reply({ message: `${branchNote}Please provide the buyer's phone number before I add the record.` }, 200, headers);
     }
 
     let lastBranchGoogleUrl: string | null = null;
@@ -350,8 +384,8 @@ Deno.serve(async (request) => {
       return { error: 'Unknown tool.' };
     }
     function addBuyerResponse(outcome: any) {
-      if (outcome.error) return json({ message: outcome.error, existingBuyerId: outcome.existingBuyerId }, 200, headers);
-      return json({
+      if (outcome.error) return reply({ message: outcome.error, existingBuyerId: outcome.existingBuyerId }, 200, headers);
+      return reply({
         message: `Click Open review form to check ${outcome.draft.name}'s details, then click Create buyer to save.${publicSourceUrl && outcome.draft.deliveryMethod === 'door' ? ` I checked the public city, province, and ZIP against ${publicSourceUrl.includes('phlpost.gov.ph') ? 'PHLPost' : 'the linked geographic source'}.` : ''}`,
         draft: outcome.draft,
         sourceUrl: resolvedPickup?.source_url ?? publicSourceUrl,
@@ -376,62 +410,62 @@ Deno.serve(async (request) => {
       const courier = /\bj\s*(?:&|and|n|\+)\s*t\b|\bjnt\b/i.test(doorSource) ? 'J&T Express' : /\blbc\b/i.test(doorSource) ? 'LBC' : null;
       if (courier && (courier === 'J&T Express' || chosenDelivery === 'door')) {
         const locationQuestion = doorLocationQuestion(doorSource);
-        if (locationQuestion) return json({ message: locationQuestion }, 200, headers);
-        if (!partialDoorAddress.city) return json({ message: 'Please provide the city and province/region for this address.' }, 200, headers);
+        if (locationQuestion) return reply({ message: locationQuestion }, 200, headers);
+        if (!partialDoorAddress.city) return reply({ message: 'Please provide the city and province/region for this address.' }, 200, headers);
         if (!partialDoorAddress.province || !partialDoorAddress.zip_code) await runTool('lookup_zip', { location: partialDoorAddress.city });
         if (verifiedPublic.city && verifiedPublic.city.toLocaleLowerCase() !== partialDoorAddress.city.toLocaleLowerCase()) {
-          return json({ message: `I could not verify ${partialDoorAddress.city} as that city or municipality. Please confirm the city name.` }, 200, headers);
+          return reply({ message: `I could not verify ${partialDoorAddress.city} as that city or municipality. Please confirm the city name.` }, 200, headers);
         }
         if (verifiedPublic.province && partialDoorAddress.province && verifiedPublic.province.toLocaleLowerCase() !== partialDoorAddress.province.toLocaleLowerCase()) {
-          return json({ message: `The province you sent conflicts with the ZIP lookup for ${partialDoorAddress.city}. Please confirm the city and province.` }, 200, headers);
+          return reply({ message: `The province you sent conflicts with the ZIP lookup for ${partialDoorAddress.city}. Please confirm the city and province.` }, 200, headers);
         }
         const address: Record<string, string> = { ...verifiedPublic, ...partialDoorAddress } as Record<string, string>;
         const missing = addressFields.filter((field) => !filled(address[field]));
-        if (missing.length) return json({ message: `Please provide the ${missing.map((field) => field === 'zip_code' ? 'ZIP code' : field).join(' and ')} for this door-to-door address. I could not verify it automatically.` }, 200, headers);
+        if (missing.length) return reply({ message: `Please provide the ${missing.map((field) => field === 'zip_code' ? 'ZIP code' : field).join(' and ')} for this door-to-door address. I could not verify it automatically.` }, 200, headers);
         return addBuyerResponse(await runTool('add_buyer', {
           ...directIdentity, preferred_courier: courier, address,
         }));
       }
     }
     if (!partialDoorAddress && addressZip && directIdentity && /\b(?:add|create|save)\s+(?:a\s+)?buyer\b/i.test(doorSource)) {
-      return json({ message: 'I could not safely separate the barangay, city, and province. Please send just the address with commas between street, barangay, city, and province.' }, 200, headers);
+      return reply({ message: 'I could not safely separate the barangay, city, and province. Please send just the address with commas between street, barangay, city, and province.' }, 200, headers);
     }
     const directAction = parseBuyerAction(latest);
     if (directAction && (directAction.action === 'delete' || directAction.patch)) {
       const candidates = await runTool('search_buyers', { query: directAction.query });
-      if (candidates.error) return json({ message: 'I could not search the buyer directory. Please try again.' }, 200, headers);
-      if (!selectedBuyerId) return json({ message: buyerSearchMessage ?? 'Please provide the exact saved buyer name or phone number.' }, 200, headers);
+      if (candidates.error) return reply({ message: 'I could not search the buyer directory. Please try again.' }, 200, headers);
+      if (!selectedBuyerId) return reply({ message: buyerSearchMessage ?? 'Please provide the exact saved buyer name or phone number.' }, 200, headers);
       if (directAction.action === 'delete') {
         const outcome = await runTool('delete_buyer', { id: selectedBuyerId });
-        if (outcome.error) return json({ message: outcome.error }, 200, headers);
-        return json({ message: `Delete ${outcome.pending.name} (${outcome.pending.phone})? To confirm, send exactly DELETE ${outcome.pending.code} within 5 minutes. The buyer stays saved until then.` }, 200, headers);
+        if (outcome.error) return reply({ message: outcome.error }, 200, headers);
+        return reply({ message: `Delete ${outcome.pending.name} (${outcome.pending.phone})? To confirm, send exactly DELETE ${outcome.pending.code} within 5 minutes. The buyer stays saved until then.` }, 200, headers);
       }
       if (directAction.patch.pickup?.branch_name) {
         const resolution = await findLbcBranch({ name: directAction.patch.pickup.branch_name });
-        if (resolution.kind === 'ambiguous') return json({ message: 'Several LBC branches match. Choose the exact branch below.', branchChoices: resolution.branches }, 200, headers);
+        if (resolution.kind === 'ambiguous') return reply({ message: 'Several LBC branches match. Choose the exact branch below.', branchChoices: resolution.branches }, 200, headers);
         if (resolution.kind === 'match') resolvedPickup = resolution.branch;
       }
       const outcome = await runTool('edit_buyer', { id: selectedBuyerId, ...directAction.patch });
-      return json({ message: outcome.error ?? outcome.message, existingBuyerId: outcome.existingBuyerId, editDraft: outcome.editDraft, sourceUrl: outcome.sourceUrl }, 200, headers);
+      return reply({ message: outcome.error ?? outcome.message, existingBuyerId: outcome.existingBuyerId, editDraft: outcome.editDraft, sourceUrl: outcome.sourceUrl }, 200, headers);
     }
     const zipQuery = zipLookupQuery(latest);
     if (zipQuery) {
       const result = await runTool('lookup_zip', { location: zipQuery });
-      if (!Array.isArray(result)) return json({ message: result.error ?? 'The ZIP lookup is unavailable right now.' }, 200, headers);
-      return json({ message: zipLookupReply(result, zipQuery), sourceUrl: result[0]?.source_url ?? publicSourceUrl ?? null }, 200, headers);
+      if (!Array.isArray(result)) return reply({ message: result.error ?? 'The ZIP lookup is unavailable right now.' }, 200, headers);
+      return reply({ message: zipLookupReply(result, zipQuery), sourceUrl: result[0]?.source_url ?? publicSourceUrl ?? null }, 200, headers);
     }
-    if (!apiKey) return json({ message: 'The assistant has not been configured yet.' }, 503, headers);
+    if (!apiKey) return reply({ message: 'The assistant has not been configured yet.' }, 503, headers);
     let requireDraftTool = reviewRequested;
     for (let step = 0; step < 4; step++) {
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'qwen/qwen3.8-27b', messages: history, tools, tool_choice: 'auto', temperature: 0.1, max_completion_tokens: 700 }), signal: AbortSignal.timeout(25000) });
       if (response.status === 429) {
         const retryAfter = Number(response.headers.get('retry-after'));
         const wait = Number.isFinite(retryAfter) && retryAfter > 0 && retryAfter <= 3600 ? ` Try again in ${Math.ceil(retryAfter)} seconds.` : ' Please try again shortly.';
-        return json({ message: `The AI service is busy.${wait}`, code: 'rate_limited' }, 429, headers);
+        return reply({ message: `The AI service is busy.${wait}`, code: 'rate_limited' }, 429, headers);
       }
       if (!response.ok) {
         console.error('Groq request failed:', response.status);
-        return json({ message: 'The AI service could not process that request. Please try again.', code: 'ai_service_error' }, 502, headers);
+        return reply({ message: 'The AI service could not process that request. Please try again.', code: 'ai_service_error' }, 502, headers);
       }
       const result = await response.json(); const message = result.choices?.[0]?.message;
       if (!message?.tool_calls?.length) {
@@ -441,9 +475,9 @@ Deno.serve(async (request) => {
             history.push({ role: 'system', content: 'No review form exists yet. Call add_buyer or edit_buyer to prepare the structured form using supplied details. If information is missing, ask one specific question. Do not describe a draft as ready or direct the user to save without a successful tool result.' });
             continue;
           }
-          return json({ message: 'I have not prepared a review form yet. Please send the missing buyer or delivery details, or click Prepare review form to retry.', prepareReview: true }, 200, headers);
+          return reply({ message: 'I have not prepared a review form yet. Please send the missing buyer or delivery details, or click Prepare review form to retry.', prepareReview: true }, 200, headers);
         }
-        return json({ message: message?.content || 'I could not complete that request.', googleSearchUrl: lastBranchGoogleUrl }, 200, headers);
+        return reply({ message: message?.content || 'I could not complete that request.', googleSearchUrl: lastBranchGoogleUrl }, 200, headers);
       }
       history.push(message);
       for (const call of message.tool_calls) {
@@ -453,19 +487,19 @@ Deno.serve(async (request) => {
           return addBuyerResponse(outcome);
         }
         if (call.function.name === 'edit_buyer') {
-          return json({ message: outcome.error ?? outcome.message, existingBuyerId: outcome.existingBuyerId, editDraft: outcome.editDraft, sourceUrl: outcome.sourceUrl }, 200, headers);
+          return reply({ message: outcome.error ?? outcome.message, existingBuyerId: outcome.existingBuyerId, editDraft: outcome.editDraft, sourceUrl: outcome.sourceUrl }, 200, headers);
         }
         if (call.function.name === 'delete_buyer') {
-          if (outcome.error) return json({ message: outcome.error }, 200, headers);
-          return json({ message: `Delete ${outcome.pending.name} (${outcome.pending.phone})? To confirm, send exactly DELETE ${outcome.pending.code} within 5 minutes. Any other message leaves the buyer in place.` }, 200, headers);
+          if (outcome.error) return reply({ message: outcome.error }, 200, headers);
+          return reply({ message: `Delete ${outcome.pending.name} (${outcome.pending.phone})? To confirm, send exactly DELETE ${outcome.pending.code} within 5 minutes. Any other message leaves the buyer in place.` }, 200, headers);
         }
         if (call.function.name === 'search_lbc_branch' && outcome.ambiguousBranches) {
-          return json({ message: 'I found more than one LBC branch. Choose the exact branch below.', branchChoices: outcome.ambiguousBranches, googleSearchUrl: lastBranchGoogleUrl }, 200, headers);
+          return reply({ message: 'I found more than one LBC branch. Choose the exact branch below.', branchChoices: outcome.ambiguousBranches, googleSearchUrl: lastBranchGoogleUrl }, 200, headers);
         }
         history.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(outcome) });
       }
     }
-    return json({ message: 'Please make that request more specific.' }, 200, headers);
+    return reply({ message: 'Please make that request more specific.' }, 200, headers);
   } catch (error) {
     console.error(error);
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {

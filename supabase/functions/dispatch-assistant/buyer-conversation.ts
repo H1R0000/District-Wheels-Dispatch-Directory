@@ -9,7 +9,7 @@ export type BuyerSummary = {
   name?: string; phone?: string; preferredCourier?: string; deliveryMethod?: string;
   address?: Record<string, string>; branchName?: string; branchAddress?: string;
 };
-const newBuyer = /\b(?:add|create|save)\s+(?:a\s+|this\s+)?(?:new\s+)?buyer\b/i;
+const newBuyer = /\b(?:add|create|start)\s+(?:(?:a|this|new|another)\s+)*buyer\b|^new\s+buyer\b/i;
 
 export function buyerSessionMessages(messages: Message[]) {
   const start = messages.findLastIndex((item) => item.completedBuyer || (item.role === 'user' && newBuyer.test(item.content ?? '')));
@@ -27,8 +27,8 @@ export function selectedBranch(messages: Message[]) {
   return branch && typeof branch.branch_name === 'string' && typeof branch.branch_address === 'string' ? branch : null;
 }
 
-export function conversationBuyer(messages: Message[]): { summary: BuyerSummary | null; changed: boolean } {
-  let summary: BuyerSummary | null = null;
+export function conversationBuyer(messages: Message[], initial: BuyerSummary | null = null): { summary: BuyerSummary | null; changed: boolean } {
+  let summary: BuyerSummary | null = initial ? structuredClone(initial) : null;
   let changed = false;
   for (let index = 0; index < messages.length; index++) {
     const message = messages[index];
@@ -38,7 +38,7 @@ export function conversationBuyer(messages: Message[]): { summary: BuyerSummary 
     const identity = parseBuyerIdentity(text);
     const pickup = parsePickupMessage(text);
     const natural = extractNaturalBuyer(/Which LBC branch and city should I use\?/.test(String(messages[index - 1]?.content ?? '')) ? `LBC branch pickup\n${text}` : text);
-    const starts = newBuyer.test(text) || (!summary && Boolean(natural.preferredCourier && (natural.name || natural.phone))) || Boolean(identity && /\b(?:lbc|jnt|j&t)\b/i.test(text)) || Boolean(pickup);
+    const starts = newBuyer.test(text) || (!summary && Boolean(natural.preferredCourier && (natural.name || natural.phone))) || (!summary && Boolean(identity && /\b(?:lbc|jnt|j&t)\b/i.test(text))) || (!summary && Boolean(pickup));
     if (/^(?:edit|update|delete|remove|find)\s+(?:a\s+)?buyer\b/i.test(text)) { summary = null; continue; }
     if (starts) { summary = {}; changed = true; }
     if (!summary) continue;

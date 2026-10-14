@@ -4,11 +4,17 @@ import { Bot, Check, Copy, MessageCircle, Send, X } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
 import { useAppAuth } from '../lib/AuthContext.jsx';
 import { draftMethodConflict } from '../utils/assistantDraft.js';
+import { activeBuyerMessages, applyBuyerState, loadBuyerState, persistBuyerState, startsNewBuyer, stateReviewMessage } from '../utils/assistantState.js';
 import { insertPromptTemplate, resizeComposer, shouldSendOnEnter, suggestedPrompts } from '../utils/assistantComposer.js';
 import { buyerSessionMessages, conversationBuyer, summaryFields } from '../../../supabase/functions/dispatch-assistant/buyer-conversation.ts';
 import { availableReviewMessage, claimsReviewForm, isReviewRequest } from '../../../supabase/functions/dispatch-assistant/review-handoff.ts';
 
 const welcomeMessage = { id: 'welcome', role: 'assistant', content: 'Paste a buyer’s details here, even if they are just a few lines. I’ll ask whether LBC delivery is Door to door or Branch pickup when needed, then prepare a form for you to review. You can also ask me to edit a buyer or look up an LBC branch or ZIP code.' };
+
+function sessionStore() {
+  try { return window.sessionStorage; }
+  catch { return null; }
+}
 
 function chatStorageKey(userId) {
   return `dcw-dispatch-chat:${userId}`;
@@ -67,6 +73,13 @@ function safeSourceUrl(value) {
 
 export default function DispatchAssistant() {
   const { id: userId } = useAppAuth();
+  const previousAccount = useRef(userId);
+  useEffect(() => {
+    if (previousAccount.current !== userId) {
+      persistBuyerState(sessionStore(), previousAccount.current, null);
+      previousAccount.current = userId;
+    }
+  }, [userId]);
   return <AssistantSession key={userId} userId={userId} />;
 }
 
@@ -74,6 +87,7 @@ function AssistantSession({ userId }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState(() => loadMessages(userId));
+  const [buyerState, setBuyerState] = useState(() => loadBuyerState(sessionStore(), userId));
   const [value, setValue] = useState(() => loadDraft(userId));
   const [busy, setBusy] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState(null);
@@ -82,15 +96,23 @@ function AssistantSession({ userId }) {
   const messagesRef = useRef(null);
   const panelRef = useRef(null);
   const requestVersion = useRef(0);
-  const reviewMessage = availableReviewMessage(messages);
+  const candidateReview = availableReviewMessage(messages);
+  const reviewMessage = buyerState ? stateReviewMessage(messages, buyerState) : candidateReview;
   const currentDraft = reviewMessage?.draft;
-  const canPrepareReview = messages.at(-1)?.role === 'assistant' && (messages.at(-1)?.prepareReview || claimsReviewForm(messages.at(-1)?.content ?? ''));
-  const buyerSummary = currentDraft ?? conversationBuyer(buyerSessionMessages(messages)).summary;
+  const canPrepareReview = Boolean(buyerState) || messages.at(-1)?.role === 'assistant' && (messages.at(-1)?.prepareReview || claimsReviewForm(messages.at(-1)?.content ?? ''));
+  const buyerSummary = buyerState?.buyerState.buyer ?? currentDraft ?? conversationBuyer(buyerSessionMessages(messages)).summary;
 
   useEffect(() => () => { requestVersion.current += 1; }, []);
+  useEffect(() => { persistBuyerState(sessionStore(), userId, buyerState); }, [buyerState, userId]);
+
+  function resetBuyerState() {
+    setBuyerState(null);
+    persistBuyerState(sessionStore(), userId, null);
+  }
 
   function clearChat() {
     requestVersion.current += 1;
+    resetBuyerState();
     setMessages([welcomeMessage]);
     setValue('');
     setBusy(false);
@@ -118,6 +140,7 @@ function AssistantSession({ userId }) {
       const destination = deliveryMethod === 'pickup' ? buyer.pickups.find((item) => item.isDefault) ?? buyer.pickups[0] : buyer.addresses.find((item) => item.isDefault) ?? buyer.addresses[0];
       const details = deliveryMethod === 'pickup' ? [destination?.branchName, destination?.branchAddress] : [destination?.street, destination?.barangay, destination?.city, destination?.province, destination?.zipCode];
       requestVersion.current += 1;
+      resetBuyerState();
       setBusy(false);
       setValue('');
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', completedBuyer: true, existingBuyerId: buyer.id, content: `${edited ? 'Updated' : 'Saved'} ${buyer.name} (${buyer.phone}).\n${buyer.preferredCourier} ${deliveryMethod === 'pickup' ? 'branch pickup' : 'door to door'}\n${details.filter(Boolean).join(', ')}` }]);
@@ -177,6 +200,9 @@ function AssistantSession({ userId }) {
       reviewDraft(reviewMessage);
       return;
     }
+    const newBuyer = startsNewBuyer(content);
+    const stateToken = newBuyer ? undefined : buyerState?.buyerStateToken;
+    if (newBuyer) resetBuyerState();
     const version = ++requestVersion.current;
     const next = [...messages, { id: crypto.randomUUID(), role: 'user', content }];
     setMessages(next);
@@ -184,17 +210,18 @@ function AssistantSession({ userId }) {
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke('dispatch-assistant', {
-        body: { messages: buyerSessionMessages(next).slice(-40).map(({ role, content: text, branchChoices }) => ({ role, content: text, ...(branchChoices ? { branchChoices } : {}) })) },
+        body: { ...(stateToken ? { buyerStateToken: stateToken } : {}), messages: activeBuyerMessages(next).slice(-40).map(({ role, content: text, branchChoices }) => ({ role, content: text, ...(branchChoices ? { branchChoices } : {}) })) },
       });
       if (version !== requestVersion.current) return;
       if (error) throw error;
       if (data?.draft) {
-        if (draftMethodConflict(next.slice(-12), data.draft)) {
+        if (draftMethodConflict(activeBuyerMessages(next).slice(-12), data.draft)) {
           setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', content: 'I stopped that draft because its delivery method does not match what you chose. Please use the buyer form directly or try again later.' }]);
           return;
         }
       }
-      setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', content: data?.message || 'I could not complete that request.', prepareReview: data?.prepareReview, existingBuyerId: data?.existingBuyerId, googleSearchUrl: safeGoogleSearchUrl(data?.googleSearchUrl), sourceUrl: safeSourceUrl(data?.sourceUrl), branchChoices: data?.branchChoices, draft: data?.draft, editDraft: data?.editDraft }]);
+      setBuyerState((current) => applyBuyerState(current, data, version, requestVersion.current));
+      setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', completedBuyer: Boolean(data?.deletedBuyer), buyerStateId: data?.buyerState?.id, buyerStateRevision: data?.buyerState?.revision, content: data?.message || 'I could not complete that request.', prepareReview: data?.prepareReview, existingBuyerId: data?.existingBuyerId, googleSearchUrl: safeGoogleSearchUrl(data?.googleSearchUrl), sourceUrl: safeSourceUrl(data?.sourceUrl), branchChoices: data?.branchChoices, draft: data?.draft, editDraft: data?.editDraft }]);
     } catch (error) {
       const message = await assistantErrorMessage(error);
       if (version !== requestVersion.current) return;
@@ -260,12 +287,13 @@ function AssistantSession({ userId }) {
           {message.existingBuyerId && <button type="button" className="assistant-result-link" onClick={() => { setOpen(false); navigate(`/buyers/${message.existingBuyerId}`); }}>Open buyer</button>}
           {safeSourceUrl(message.sourceUrl) && <a className="assistant-result-link" href={message.sourceUrl} target="_blank" rel="noopener noreferrer">View source</a>}
           {safeGoogleSearchUrl(message.googleSearchUrl) && <a className="assistant-result-link" href={message.googleSearchUrl} target="_blank" rel="noopener noreferrer">Check on Google</a>}
-          {(message.draft || message.editDraft) && message === messages.at(-1) && <button type="button" disabled={busy} className="assistant-result-link" onClick={() => reviewDraft(message)}>Review and edit form</button>}
+          {(message.draft || message.editDraft) && message === reviewMessage && <button type="button" disabled={busy} className="assistant-result-link" onClick={() => reviewDraft(message)}>Review and edit form</button>}
           {Array.isArray(message.branchChoices) && <div className="assistant-choices">{message.branchChoices.map((branch, index) => <div className="assistant-choice" key={`${branch.branch_name}-${branch.branch_address}`}><button type="button" disabled={busy || message !== messages.at(-1)} onClick={() => submitMessage(`Use option ${index + 1}`)}><strong>{index + 1}. {branch.branch_name}</strong><span>{branch.branch_address}</span></button>{safeSourceUrl(branch.source_url) && <a href={safeSourceUrl(branch.source_url)} target="_blank" rel="noopener noreferrer">View LBC source</a>}</div>)}</div>}
         </div>)}
         {busy && <div className="assistant-message assistant" role="status">Thinking…</div>}
         {buyerSummary && <section className="assistant-buyer-summary" aria-label="Current buyer summary">
-          <h3>Current buyer <small>Not saved</small></h3>
+          <h3>Current buyer <small>{buyerState?.buyerState.status === 'ready' || reviewMessage ? 'Ready for review' : 'Missing details'}</small></h3>
+          <p>Not saved — your details stay here while we finish the draft.</p>
           <p>Tap a detail to correct it, or review the form when ready.</p>
           <dl>{summaryFields(buyerSummary).map(([label, detail, field]) => <div key={field}>
             <dt>{label}</dt><dd><button type="button" disabled={busy} aria-label={`Change ${label.toLowerCase()}: ${detail || 'missing'}`} className={!detail ? 'is-missing' : ''} onClick={() => { if (field === 'courier' || field === 'delivery') setChoosingDelivery(true); else { setValue(`Change ${field} to `); inputRef.current?.focus(); } }}>{detail || 'Missing — add detail'}</button></dd>
