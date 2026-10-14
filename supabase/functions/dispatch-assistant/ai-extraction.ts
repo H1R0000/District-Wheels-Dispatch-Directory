@@ -21,7 +21,12 @@ export function validateExtraction(raw: unknown, text: string, current: BuyerSum
     const value = patch[field];
     const hasEvidence = value && (supplied(value, text) || (field === 'branchName' && value.split(',').every((part) => part.trim() && supplied(part, text))));
     if (!value || !hasEvidence) continue;
-    if (field === 'name' && (!/^[\p{L}][\p{L}.' -]+$/u.test(value) || value.trim().split(/\s+/).length < 2 || /\b(?:branch|lbc|mall|imall|robinsons|waltermart|puregold|gaisano|sm|street|brgy|road|city|province|pangalan|courier|ito)\b|^(?:si|kay|can you|could you|would you|please add|name is)\b/i.test(value))) continue;
+    if (field === 'name') {
+      if (!/^[\p{L}][\p{L}.' -]+$/u.test(value) || value.trim().split(/\s+/).length < 2 || /\b(?:branch|lbc|mall|imall|robinsons|waltermart|puregold|gaisano|sm|street|brgy|road|city|province|pangalan|courier|ito|palitan|numero|niya|phone|contact|mobile|change|update|correct|replace)\b|^(?:si|kay|can you|could you|would you|please add|name is)\b/i.test(value)) continue;
+      // Existing identity only changes when the user identifies the name field.
+      // A phone correction's introductory words must never become a replacement name.
+      if (current.name && norm(value) !== norm(current.name) && !/\b(?:name|pangalan)\b/i.test(text)) continue;
+    }
     if (field !== 'name') {
       if (/(?:\+?63|0)9\d{9}/.test(value.replace(/[ ().-]/g, ''))) continue;
       const identities = [current.name, accepted.name].filter(Boolean) as string[];

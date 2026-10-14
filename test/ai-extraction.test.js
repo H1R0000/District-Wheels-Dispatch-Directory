@@ -25,6 +25,21 @@ test('informal correction is extracted with supported strict schema and preserve
   assert.match(buyerRequest(buyer), /09170008882/);
 });
 
+test('live informal phone correction never replaces the known buyer name with introductory words', async () => {
+  const text = 'palitan numero niya ng 09170008899';
+  const candidate = conversationBuyer([{ role: 'user', content: text }], current).summary;
+  const validated = validateBuyerChange(candidate, text, current);
+  const updated = mergeBuyer(current, validated);
+  assert.equal(updated.name, 'Ana Example');
+  assert.equal(updated.phone, '09170008899');
+  assert.deepEqual(updated.address, current.address);
+  assert.equal(updated.preferredCourier, current.preferredCourier);
+  assert.equal(updated.deliveryMethod, current.deliveryMethod);
+  assert.deepEqual(validateExtraction({ name: 'Brian Example' }, 'use Brian Example instead', current), {});
+  const changedName = await extractBuyerWithAI('palitan pangalan niya sa Brian Example', current, 'test-key', async () => response({ name: 'Brian Example' }));
+  assert.equal(mergeBuyer(current, changedName).name, 'Brian Example');
+});
+
 test('unfamiliar first buyer request can extract supplied fields and ask one missing detail', async () => {
   const text = 'Can you add a buyer? Kay Ana Example ito, JNT, phone 09170008881, 12 Palm St, barangay San Juan, Cainta, Rizal';
   assert.equal(buyerMutationMessage(text), true);
