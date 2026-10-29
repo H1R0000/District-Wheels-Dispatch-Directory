@@ -23,7 +23,9 @@ function mapPickup(row) {
 
 export class PostgresStore {
   constructor(connectionString, migrationUrl) {
-    this.pool = new Pool({ connectionString, ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined });
+    this.pool = new Pool({ connectionString, ssl: process.env.DATABASE_SSL === 'true'
+      ? { rejectUnauthorized: true, ...(process.env.DATABASE_CA_CERT ? { ca: process.env.DATABASE_CA_CERT } : {}) }
+      : undefined });
     this.migrationUrl = migrationUrl;
   }
 

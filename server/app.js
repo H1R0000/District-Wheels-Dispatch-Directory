@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { MemoryStore } from './store.js';
 import { normalizePhone } from './phone.js';
+import { randomUUID } from 'node:crypto';
 
 const addressFields = ['street', 'barangay', 'city', 'province', 'zipCode'];
 const pickupFields = ['branchName', 'branchAddress'];
@@ -10,6 +11,22 @@ const fieldLabels = { street: 'street or building', barangay: 'barangay', city: 
 
 function validateBuyer(body) {
   const errors = {};
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { body: 'Send a buyer object.' };
+  for (const field of ['addresses', 'pickups']) {
+    if (body[field] !== undefined && (!Array.isArray(body[field]) || body[field].length > 20 || body[field].some((item) => !item || typeof item !== 'object' || Array.isArray(item)))) {
+      errors[field] = 'Send at most 20 location objects.';
+    }
+  }
+  if (Object.keys(errors).length) return errors;
+  for (const [field, value] of Object.entries(body)) {
+    if (!['addresses', 'pickups'].includes(field) && (typeof value !== 'string' || value.length > 500)) errors[field] = 'Send text of at most 500 characters.';
+  }
+  for (const location of [...(body.addresses ?? []), ...(body.pickups ?? [])]) {
+    for (const [field, value] of Object.entries(location)) {
+      if (field === 'isDefault' ? typeof value !== 'boolean' : typeof value !== 'string' || value.length > 500) errors[field] = 'Invalid location field.';
+    }
+  }
+  if (Object.keys(errors).length) return errors;
   if (!String(body.name ?? '').trim()) errors.name = 'Enter the buyer’s full name.';
   if (!String(body.phone ?? '').trim()) errors.phone = 'Enter the buyer’s phone number.';
   if (String(body.phone ?? '').trim() && !normalizePhone(body.phone)) errors.phone = 'Enter a valid phone number.';
@@ -30,13 +47,17 @@ function validateBuyer(body) {
 export function createApp(store = new MemoryStore(), options = {}) {
   const app = express();
   app.disable('x-powered-by');
+  app.use((_request, response, next) => {
+    response.set({ 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'strict-origin-when-cross-origin' });
+    next();
+  });
   app.use(express.json({ limit: '100kb' }));
 
   app.get('/api/health', (_request, response) => response.json({ status: 'ok' }));
 
   // The legacy API has no Supabase user context. Keep it for explicit local
   // development/tests only; production clients use Supabase with RLS.
-  if (options.enableLegacyApi === false) {
+  if (options.enableLegacyApi !== true) {
     app.use('/api/buyers', (_request, response) => response.status(404).json({ message: 'Not found' }));
   }
 
@@ -82,9 +103,15 @@ export function createApp(store = new MemoryStore(), options = {}) {
     app.get('/{*splat}', (_request, response) => response.sendFile(resolve(options.clientPath, 'index.html')));
   }
 
-  app.use((error, _request, response, _next) => {
-    console.error(error);
-    response.status(500).json({ message: 'The server could not complete the request.' });
+  app.use((error, request, response, _next) => {
+    const correlationId = randomUUID();
+    const status = error.type === 'entity.too.large' ? 413
+      : error.type === 'entity.parse.failed' ? 400
+      : error.status === 415 ? 415 : 500;
+    if (status === 500) console.error({ correlationId, error });
+    const message = status === 413 ? 'The request is too large.' : status === 400 ? 'Send valid JSON.'
+      : status === 415 ? 'Unsupported request encoding.' : 'The server could not complete the request.';
+    response.status(status).type('application/problem+json').json({ type: 'about:blank', title: message, status, detail: message, instance: request.path, correlationId, message });
   });
   return app;
 }

@@ -33,3 +33,58 @@ District Wheels Dispatch Directory stores buyer names, phone numbers, and delive
 - [ ] Verify a private backup can be restored by the approved owner in the hosted app without changing existing records.
 
 The main remaining privacy risk is sending real buyer details to the assistant's external model. Until that handling has been reviewed, use fictional demo data and minimize what is entered into chat.
+# Security maintenance — October 29, 2026
+
+Compatible lockfile updates remediate npm advisories affecting body-parser,
+concurrently, qs, shell-quote, source-map-js, and Vite. The audit went from six
+affected packages (two critical, three high, one moderate) to zero.
+
+The Express buyer API now requires explicit `enableLegacyApi: true` even when
+created outside the normal entry point. The entry point binds it to loopback
+when enabled. Invalid input shapes receive validation errors, and malformed or
+oversized JSON receives sanitized problem responses. The server has explicit
+request and header timeouts. PostgreSQL TLS now verifies certificates; a private
+CA can be supplied through `DATABASE_CA_CERT` when `DATABASE_SSL=true`.
+
+The assistant accepts at most 100 KiB of JSON with a 15-second body deadline,
+validates conversation roles and field lengths, and rejects client-supplied
+system/tool messages. Its Supabase SDK import is pinned. A database quota permits
+20 requests per account per minute across workers, using the same owner OAuth
+and demo allowlist as buyer RLS. Failures to check that quota fail closed.
+Vercel configuration adds CSP, clickjacking protection, HSTS, and other browser
+security headers.
+
+Deployment order: apply `20261029060000_assistant_request_limits.sql` to Supabase,
+then deploy `dispatch-assistant`, then deploy the updated frontend/Vercel
+configuration. Deploying the function before the migration makes assistant
+requests return 503 until the migration exists.
+
+Deployed October 29, 2026: the migration was applied and recorded in one
+transaction without replaying older migrations; `dispatch-assistant` was then
+deployed, followed by a successful Vercel preview and production build.
+Production deployment `dpl_AhSmq2vvnymKJoS9UWgmQcchDQ1v` is aliased to
+https://district-wheels-dispatch-directory.vercel.app. Deployment uploads now
+exclude environment files, private local data, temporary files, and unrelated
+presentation material through `.vercelignore`.
+
+A verified private backup was saved outside the repository before migration.
+Counts and row fingerprints stayed unchanged for buyers (57), addresses (8),
+pickup locations (49), and audit logs (71). Live checks passed for demo sign-in,
+demo-only buyer visibility, assistant lookup, rate-limit headers, rejection of
+system-role messages (400), oversized input (413), and unapproved origins (403).
+The live quota allowed 20 calls and denied the next inside a transaction that
+was rolled back, preserving real quota usage. Anonymous RPC execution and direct
+authenticated quota-table writes were verified denied. Chrome checks passed for
+production security headers, demo directory access, and direct buyer-form
+navigation with zero runtime errors or CSP violations. Interactive owner GitHub
+OAuth sign-in was not exercised during this release.
+
+Validation: 132 Node tests passed and the production build passed. An isolated
+PostgreSQL-compatible PGlite runtime executed the new migration and checked the
+allowlist denial, quota exhaustion, account isolation, expiry, and grants. This
+does not alone validate the hosted Supabase configuration or Edge runtime; live
+release checks are recorded above. The security
+skill's hygiene scanner reported no findings in client or Edge source; its two
+server SQL warnings were reviewed as false positives because both INSERTs use
+static SQL and separate parameter arrays. An unrestricted root scan also included
+ignored temporary Chrome extension code, which is not shipped with the app.

@@ -14,6 +14,9 @@ const app = createApp(store, {
   enableLegacyApi: process.env.ENABLE_LEGACY_API === 'true',
 });
 
-app.listen(port, () => {
+const server = app.listen(port, process.env.ENABLE_LEGACY_API === 'true' ? '127.0.0.1' : (process.env.HOST || '0.0.0.0'), () => {
   console.log(`District Wheels API listening on http://localhost:${port}`);
 });
+server.headersTimeout = 10000;
+server.requestTimeout = 15000;
+server.keepAliveTimeout = 5000;

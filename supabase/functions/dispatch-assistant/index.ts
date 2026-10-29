@@ -1,5 +1,5 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { cors, json } from '../_shared/http.ts';
+import { createClient } from 'npm:@supabase/supabase-js@2.116.0';
+import { cors, json, readJsonObject, RequestError, validateAssistantBody } from '../_shared/http.ts';
 import { confirmedBranchClues, confirmedBranchForBuyerReply, extractLbcClues, parsePickupAddressFollowUp, parsePickupConfirmation, parsePickupMessage, resolveLbcBranch, searchTerms, type LbcBranch } from './lbc-resolver.ts';
 import { draftEvidenceError } from './draft-evidence.ts';
 import { chooseDeliveryMethod, statedDeliveryMethod } from './delivery-method.ts';
@@ -43,8 +43,15 @@ Deno.serve(async (request) => {
     if (!auth.user) return json({ message: 'Sign in again.' }, 401, headers);
     const { data: profile } = await db.from('profiles').select('role,is_demo').eq('id', auth.user.id).maybeSingle();
     if (!profile) return json({ message: 'This account is not approved.' }, 403, headers);
+    const { data: quota, error: quotaError } = await db.rpc('claim_assistant_request_slot');
+    if (quotaError) return json({ message: 'The assistant is temporarily unavailable.' }, 503, headers);
+    if (!quota?.authorized) return json({ message: 'This session is not approved.' }, 403, headers);
+    const quotaHeaders = { 'RateLimit-Limit': '20', 'RateLimit-Remaining': String(quota.remaining), 'RateLimit-Reset': String(quota.retry_after) };
+    Object.assign(headers, quotaHeaders);
+    if (!quota.allowed) return json({ message: 'Too many requests. Try again shortly.', code: 'rate_limited' }, 429, { ...headers, 'Retry-After': String(quota.retry_after) });
     const apiKey = Deno.env.get('GROQ_API_KEY');
-    const body = await request.json();
+    const body = await readJsonObject(request);
+    validateAssistantBody(body);
     const incoming = buyerSessionMessages(Array.isArray(body.messages) ? body.messages.slice(-40) : []);
     const latestInput = String(incoming.at(-1)?.content ?? '').trim();
     const stateSecret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -501,6 +508,7 @@ Deno.serve(async (request) => {
     }
     return reply({ message: 'Please make that request more specific.' }, 200, headers);
   } catch (error) {
+    if (error instanceof RequestError) return json({ message: error.message, code: 'invalid_request' }, error.status, headers);
     console.error(error);
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
       return json({ message: 'The lookup or AI service took too long. Please try again.', code: 'timeout' }, 504, headers);
