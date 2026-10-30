@@ -8,7 +8,7 @@ let server;
 let baseUrl;
 
 before(async () => {
-  server = createApp(new MemoryStore()).listen(0);
+  server = createApp(new MemoryStore(), { enableLegacyApi: true }).listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
@@ -22,7 +22,7 @@ test('health endpoint reports ok', async () => {
 });
 
 test('production mode closes the unauthenticated legacy buyer API', async () => {
-  const lockedServer = createApp(new MemoryStore(), { enableLegacyApi: false }).listen(0);
+  const lockedServer = createApp(new MemoryStore()).listen(0);
   await new Promise((resolve) => lockedServer.once('listening', resolve));
   try {
     const url = `http://127.0.0.1:${lockedServer.address().port}/api/buyers`;
@@ -119,4 +119,25 @@ test('buyer can be created, updated, and deleted with one normalized default', a
 test('unknown buyer returns 404 for read, update, and delete', async () => {
   assert.equal((await fetch(`${baseUrl}/api/buyers/missing`)).status, 404);
   assert.equal((await fetch(`${baseUrl}/api/buyers/missing`, { method: 'DELETE' })).status, 404);
+});
+
+test('malformed and oversized JSON receive safe client errors', async () => {
+  for (const [body, status] of [['{', 400], [JSON.stringify({ name: 'a'.repeat(102401) }), 413]]) {
+    const response = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    assert.equal(response.status, status);
+    assert.match(response.headers.get('content-type'), /application\/problem\+json/);
+    const problem = await response.json();
+    assert.equal(problem.status, status);
+    assert.ok(problem.correlationId);
+    assert.equal(problem.stack, undefined);
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  }
+});
+
+test('invalid location shapes and field types never reach buyer storage', async () => {
+  for (const fields of [{ addresses: {} }, { pickups: [null] }, { addresses: ['invalid'] }, { name: { invalid: true } }, { pickups: [{ branchName: 42 }] }]) {
+    const response = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Test', phone: '09170000000', preferredCourier: 'LBC', ...fields }) });
+    assert.equal(response.status, 400);
+    assert.ok((await response.json()).errors);
+  }
 });

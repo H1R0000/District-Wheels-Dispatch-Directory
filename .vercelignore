@@ -1,0 +1,16 @@
+.git/
+.env
+.env.*
+**/.env
+**/.env.*
+node_modules/
+client/dist/
+tmp/
+backups/
+data/
+presentation/
+skills.md
+docs/
+journal/
+test/
+coverage/
