@@ -1,9 +1,8 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { seedBuyers } from './seed-data.js';
-import { normalizePhone } from './phone.js';
-import { formatBuyerName } from '../shared/buyerName.js';
+import { seedBuyers } from './buyers.js';
+import { formatBuyerName } from '../../shared/buyerName.js';
+import { ApiError } from '../../server/errors.js';
+const normalizePhone = (value) => String(value ?? '').replace(/\D/g, '');
 
 const clone = (value) => structuredClone(value);
 
@@ -69,24 +68,11 @@ export class MemoryStore {
     return true;
   }
 
+  async save(input, id) {
+    if (id && !await this.get(id)) throw new ApiError(404, 'Buyer not found.');
+    if (this.buyers.some((buyer) => buyer.id !== id && buyer.phone === input.phone)) throw { code: '23505' };
+    return id ? this.update(id, input) : this.create(input);
+  }
   async persist() {}
 }
 
-export class JsonStore extends MemoryStore {
-  constructor(filePath) { super([]); this.filePath = filePath; }
-
-  async initialize() {
-    try { this.buyers = JSON.parse(await readFile(this.filePath, 'utf8')); }
-    catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-      this.buyers = clone(seedBuyers);
-      await this.persist();
-    }
-    return this;
-  }
-
-  async persist() {
-    await mkdir(dirname(this.filePath), { recursive: true });
-    await writeFile(this.filePath, `${JSON.stringify(this.buyers, null, 2)}\n`, 'utf8');
-  }
-}

@@ -1,14 +1,20 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { createApp } from '../server/app.js';
-import { MemoryStore } from '../server/store.js';
+import { MemoryStore } from './helpers/repository.js';
+import { ApiError } from '../server/errors.js';
 import { buildBuyerPayload } from '../client/src/utils/buyerPayload.js';
 
+const repository = new MemoryStore();
+const authenticatedFetch = (url, options = {}) => fetch(url, { ...options, headers: { Authorization: 'Bearer test-demo', ...options.headers } });
 let server;
 let baseUrl;
 
 before(async () => {
-  server = createApp(new MemoryStore(), { enableLegacyApi: true }).listen(0);
+  server = createApp({ authenticate: async (request) => {
+    if (request.headers.authorization !== 'Bearer test-demo') throw new ApiError(401, 'Sign in to continue.');
+    return { repository, role: 'demo', quota: { allowed: true, remaining: 119, retry_after: 60 } };
+  } }).listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
@@ -16,39 +22,39 @@ before(async () => {
 after(() => server.close());
 
 test('health endpoint reports ok', async () => {
-  const response = await fetch(`${baseUrl}/api/health`);
+  const response = await authenticatedFetch(`${baseUrl}/api/health`);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { status: 'ok' });
 });
 
-test('production mode closes the unauthenticated legacy buyer API', async () => {
-  const lockedServer = createApp(new MemoryStore()).listen(0);
+test('buyer API rejects requests without authentication', async () => {
+  const lockedServer = createApp().listen(0);
   await new Promise((resolve) => lockedServer.once('listening', resolve));
   try {
     const url = `http://127.0.0.1:${lockedServer.address().port}/api/buyers`;
-    assert.equal((await fetch(url)).status, 404);
-    assert.equal((await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 404);
+    assert.equal((await fetch(url)).status, 401);
+    assert.equal((await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 401);
   } finally {
     lockedServer.close();
   }
 });
 
 test('buyer search matches names and phone numbers', async () => {
-  const nameResults = await (await fetch(`${baseUrl}/api/buyers?q=maria`)).json();
+  const nameResults = await (await authenticatedFetch(`${baseUrl}/api/buyers?q=maria`)).json();
   assert.equal(nameResults.length, 1);
   assert.equal(nameResults[0].name, 'Maria Santos');
   assert.equal('addresses' in nameResults[0], false);
-  const phoneResults = await (await fetch(`${baseUrl}/api/buyers?q=${encodeURIComponent('(0918) 204')}`)).json();
+  const phoneResults = await (await authenticatedFetch(`${baseUrl}/api/buyers?q=${encodeURIComponent('(0918) 204')}`)).json();
   assert.equal(phoneResults[0].name, 'Carlo Reyes');
 });
 
 test('buyer directory is alphabetical by name', async () => {
-  const buyers = await (await fetch(`${baseUrl}/api/buyers`)).json();
+  const buyers = await (await authenticatedFetch(`${baseUrl}/api/buyers`)).json();
   assert.deepEqual(buyers.map((buyer) => buyer.name), ['Angela Cruz', 'Carlo Reyes', 'Maria Santos']);
 });
 
 test('invalid buyer payload returns field errors', async () => {
-  const response = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  const response = await authenticatedFetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   assert.equal(response.status, 400);
   const result = await response.json();
   assert.equal(result.errors.name, 'Enter the buyer’s full name.');
@@ -56,7 +62,7 @@ test('invalid buyer payload returns field errors', async () => {
 });
 
 test('J&T requires a complete address', async () => {
-  const response = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'J&T Buyer', phone: '0918 000 0000', preferredCourier: 'J&T Express', addresses: [], pickups: [] }) });
+  const response = await authenticatedFetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'J&T Buyer', phone: '0918 000 0000', preferredCourier: 'J&T Express', addresses: [], pickups: [] }) });
   assert.equal(response.status, 400);
   assert.equal((await response.json()).errors.addresses, 'Add a complete J&T delivery address.');
 });
@@ -78,7 +84,7 @@ test('switching a buyer to J&T preserves complete LBC pickup details', () => {
 
 test('LBC branch pickup reuses the buyer name and phone', async () => {
   const payload = { name: 'Pickup Buyer', phone: '(0917) 180 3828', preferredCourier: 'LBC', addresses: [], pickups: [{ branchName: '  LBC Test Branch  ', branchAddress: '  1 Branch Road, Manila  ', isDefault: true }] };
-  const createResponse = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const createResponse = await authenticatedFetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   assert.equal(createResponse.status, 201);
   const created = await createResponse.json();
   assert.equal(created.addresses.length, 0);
@@ -87,7 +93,7 @@ test('LBC branch pickup reuses the buyer name and phone', async () => {
   assert.equal(created.pickups[0].recipientPhone, '09171803828');
   assert.equal(created.pickups[0].branchName, 'LBC Test Branch');
   assert.equal(created.pickups[0].branchAddress, '1 Branch Road, Manila');
-  await fetch(`${baseUrl}/api/buyers/${created.id}`, { method: 'DELETE' });
+  await authenticatedFetch(`${baseUrl}/api/buyers/${created.id}`, { method: 'DELETE' });
 });
 
 test('buyer can be created, updated, and deleted with one normalized default', async () => {
@@ -98,32 +104,32 @@ test('buyer can be created, updated, and deleted with one normalized default', a
       { recipientName: 'Test Buyer', recipientPhone: '0999 000 1111', street: '2 Test Road', barangay: 'Test', city: 'Manila', province: 'Metro Manila', zipCode: '1000', isDefault: true },
     ], pickups: [],
   };
-  const createResponse = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const createResponse = await authenticatedFetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   assert.equal(createResponse.status, 201);
   const created = await createResponse.json();
   assert.equal(created.addresses.filter((item) => item.isDefault).length, 1);
 
   created.name = 'Updated Buyer';
   created.phone = '(0917) 180 3828';
-  const updateResponse = await fetch(`${baseUrl}/api/buyers/${created.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(created) });
+  const updateResponse = await authenticatedFetch(`${baseUrl}/api/buyers/${created.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(created) });
   assert.equal(updateResponse.status, 200);
   const updated = await updateResponse.json();
   assert.equal(updated.name, 'Updated Buyer');
   assert.equal(updated.phone, '09171803828');
   assert.equal(updated.addresses[0].recipientPhone, '09171803828');
 
-  assert.equal((await fetch(`${baseUrl}/api/buyers/${created.id}`, { method: 'DELETE' })).status, 204);
-  assert.equal((await fetch(`${baseUrl}/api/buyers/${created.id}`)).status, 404);
+  assert.equal((await authenticatedFetch(`${baseUrl}/api/buyers/${created.id}`, { method: 'DELETE' })).status, 204);
+  assert.equal((await authenticatedFetch(`${baseUrl}/api/buyers/${created.id}`)).status, 404);
 });
 
 test('unknown buyer returns 404 for read, update, and delete', async () => {
-  assert.equal((await fetch(`${baseUrl}/api/buyers/missing`)).status, 404);
-  assert.equal((await fetch(`${baseUrl}/api/buyers/missing`, { method: 'DELETE' })).status, 404);
+  assert.equal((await authenticatedFetch(`${baseUrl}/api/buyers/missing`)).status, 404);
+  assert.equal((await authenticatedFetch(`${baseUrl}/api/buyers/missing`, { method: 'DELETE' })).status, 404);
 });
 
 test('malformed and oversized JSON receive safe client errors', async () => {
   for (const [body, status] of [['{', 400], [JSON.stringify({ name: 'a'.repeat(102401) }), 413]]) {
-    const response = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    const response = await authenticatedFetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
     assert.equal(response.status, status);
     assert.match(response.headers.get('content-type'), /application\/problem\+json/);
     const problem = await response.json();
@@ -136,7 +142,7 @@ test('malformed and oversized JSON receive safe client errors', async () => {
 
 test('invalid location shapes and field types never reach buyer storage', async () => {
   for (const fields of [{ addresses: {} }, { pickups: [null] }, { addresses: ['invalid'] }, { name: { invalid: true } }, { pickups: [{ branchName: 42 }] }]) {
-    const response = await fetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Test', phone: '09170000000', preferredCourier: 'LBC', ...fields }) });
+    const response = await authenticatedFetch(`${baseUrl}/api/buyers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Test', phone: '09170000000', preferredCourier: 'LBC', ...fields }) });
     assert.equal(response.status, 400);
     assert.ok((await response.json()).errors);
   }

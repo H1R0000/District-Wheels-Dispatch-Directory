@@ -26,7 +26,11 @@ begin
   select i.user_id into owner_uuid from auth.identities i
   where i.provider = 'github' and i.provider_id = '185481992';
   if owner_uuid is null then
-    raise exception 'Verified H1R0000 GitHub identity is missing';
+    if exists (select 1 from public.buyers) then
+      raise exception 'Owner identity is missing for existing buyer data';
+    end if;
+    -- Empty installs stay closed until an administrator provisions profiles.
+    return;
   end if;
   if exists (select 1 from public.buyers where owner_id <> owner_uuid) then
     raise exception 'Unexpected buyer owner; inspect before applying allowlist';

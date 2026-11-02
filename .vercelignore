@@ -13,4 +13,6 @@ skills.md
 docs/
 journal/
 test/
+integration/
+.github/
 coverage/

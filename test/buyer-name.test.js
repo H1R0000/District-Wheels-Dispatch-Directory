@@ -3,7 +3,7 @@ import test from 'node:test';
 import { formatBuyerName } from '../shared/buyerName.js';
 import { buildBuyerPayload } from '../client/src/utils/buyerPayload.js';
 import { applyAssistantEdit } from '../client/src/utils/assistantEdit.js';
-import { MemoryStore } from '../server/store.js';
+import { MemoryStore } from './helpers/repository.js';
 
 for (const [input, expected] of [
   ['EDRIAN ERECRE', 'Edrian Erecre'],

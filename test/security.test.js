@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readJsonObject, RequestError, validateAssistantBody } from '../supabase/functions/_shared/http.ts';
-import { PostgresStore } from '../server/postgres-store.js';
 
 const request = (body, headers = { 'content-type': 'application/json' }) => new Request('https://example.test', { method: 'POST', headers, body });
 
@@ -35,20 +34,4 @@ test('assistant rejects injected system/tool roles and unbounded or malformed co
     { messages: [{ role: 'assistant', content: 'Done' }] }, { messages: [{ ...user, branchChoices: [null] }] },
     { messages: [user], buyerStateToken: 'x'.repeat(12001) },
   ]) assert.throws(() => validateAssistantBody(body), RequestError);
-});
-
-test('explicit PostgreSQL TLS verifies the certificate and supports a private CA', async () => {
-  const oldSsl = process.env.DATABASE_SSL;
-  const oldCa = process.env.DATABASE_CA_CERT;
-  process.env.DATABASE_SSL = 'true';
-  process.env.DATABASE_CA_CERT = 'test-ca';
-  const store = new PostgresStore('postgres://localhost/test');
-  try {
-    assert.equal(store.pool.options.ssl.rejectUnauthorized, true);
-    assert.equal(store.pool.options.ssl.ca, 'test-ca');
-  } finally {
-    await store.pool.end();
-    if (oldSsl === undefined) delete process.env.DATABASE_SSL; else process.env.DATABASE_SSL = oldSsl;
-    if (oldCa === undefined) delete process.env.DATABASE_CA_CERT; else process.env.DATABASE_CA_CERT = oldCa;
-  }
 });
