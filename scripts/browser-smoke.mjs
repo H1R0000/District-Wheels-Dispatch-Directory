@@ -7,7 +7,7 @@ const target = new URL(base);
 if (!['localhost', '127.0.0.1'].includes(target.hostname) && !/^district-wheels-dispatch-directory-[a-z0-9]+\.vercel\.app$/.test(target.hostname)) throw new Error('Smoke mutations are restricted to local and explicit preview deployment URLs.');
 const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_CHANNEL ? { channel: process.env.BROWSER_CHANNEL } : {}) });
 let createdId, token, context;
-const errors = [], buyerRequests = [], violations = [];
+const errors = [], buyerRequests = [], violations = [], httpFailures = [];
 try {
   context = await browser.newContext();
   // Optional protected-preview storage state is generated privately by release tooling.
@@ -17,6 +17,12 @@ try {
   }
   const page = await context.newPage();
   page.on('pageerror', (error) => errors.push(error.message));
+  page.on('response', (response) => {
+    if (response.status() >= 400) {
+      const path = new URL(response.url()).pathname;
+      httpFailures.push({ service: path.includes('/functions/') ? 'function' : path.startsWith('/api/') ? 'API' : 'other', status: response.status() });
+    }
+  });
   await page.exposeFunction('reportCspViolation', (directive) => violations.push(directive));
   await page.addInitScript(() => document.addEventListener('securitypolicyviolation', (event) => window.reportCspViolation(event.violatedDirective)));
   page.on('request', (request) => {
@@ -56,6 +62,12 @@ try {
   await mkdir('tmp', { recursive: true });
   await page.screenshot({ path: 'tmp/application-api-smoke.png', fullPage: true });
   console.log(JSON.stringify({ target: target.hostname, demoSignIn: 'passed', buyerCrudViaExpress: 'passed', directRoute: 'passed', assistant: 'passed', runtimeErrors: 0, cspViolations: 0 }));
+} catch (error) {
+  const page = context?.pages()[0];
+  console.error(JSON.stringify({ httpFailures, runtimeErrors: errors, cspViolations: violations, signInMessage: await page?.locator('.auth-message').textContent({ timeout: 500 }).catch(() => null) }));
+  await mkdir('tmp', { recursive: true });
+  await page?.screenshot({ path: 'tmp/application-api-smoke-failure.png', fullPage: true }).catch(() => {});
+  throw error;
 } finally {
   if (createdId && token) {
     const cleanup = await context.request.delete(`${base}/api/buyers/${encodeURIComponent(createdId)}`, { headers: { Authorization: token } });
