@@ -71,8 +71,8 @@ export default function BuyerDetailsPage() {
     if (!window.confirm(`Delete ${buyer.name}? This cannot be undone.`)) return;
     setStatus('deleting');
     try {
-      if (await removeBuyer(buyerId)) navigate('/', { replace: true });
-      else setStatus('not-found');
+      await removeBuyer(buyerId);
+      navigate('/', { replace: true });
     } catch { setStatus('error'); }
   }
 

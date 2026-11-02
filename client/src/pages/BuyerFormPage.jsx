@@ -5,6 +5,7 @@ import { buildBuyerPayload } from '../utils/buyerPayload.js';
 import { getBuyer, saveBuyer } from '../lib/buyers.js';
 import { applyAssistantEdit, editedDeliveryMethod } from '../utils/assistantEdit.js';
 import { formatBuyerName } from '../../../shared/buyerName.js';
+import { validateBuyer } from '../../../shared/buyerValidation.js';
 
 const emptyAddress = () => ({ street: '', barangay: '', city: '', province: '', zipCode: '', isDefault: false });
 const emptyPickup = () => ({ branchName: '', branchAddress: '', isDefault: false });
@@ -132,17 +133,8 @@ export default function BuyerFormPage() {
   async function submit(event) {
     event.preventDefault();
     setMessage('');
-    const nextErrors = {};
-    if (!buyer.name.trim()) nextErrors.name = 'Enter the buyer’s name.';
-    if (!/^\d{7,15}$/.test(buyer.phone.replace(/\D/g, ''))) nextErrors.phone = 'Enter a valid phone number.';
-    const locationType = deliveryMethod === 'pickup' ? 'pickups' : 'addresses';
-    const fields = deliveryMethod === 'pickup' ? pickupFields : addressFields;
-    if (!buyer[locationType].length) nextErrors.locations = 'Add a delivery location.';
-    buyer[locationType].forEach((item, index) => {
-      fields.forEach(([field, label]) => {
-        if (!String(item[field] ?? '').trim()) nextErrors[`${locationType}.${index}.${field}`] = `Enter ${label.toLowerCase()}.`;
-      });
-    });
+    const payload = buildBuyerPayload(buyer, deliveryMethod);
+    const { errors: nextErrors } = validateBuyer(payload);
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       setMessage('Complete the highlighted details before saving.');
@@ -152,12 +144,12 @@ export default function BuyerFormPage() {
     setErrors({});
     setStatus('saving');
     try {
-      const payload = buildBuyerPayload(buyer, deliveryMethod);
       const result = await saveBuyer(payload, isEditing ? buyerId : undefined);
       if (!result) throw new Error('The save could not be verified. Please check the buyer directory before trying again.');
       window.dispatchEvent(new CustomEvent('dispatch-buyer-saved', { detail: { buyer: result, edited: isEditing, deliveryMethod } }));
       navigate(`/buyers/${result.id}`, { replace: true, state: { saved: isEditing ? 'updated' : 'created' } });
     } catch (error) {
+      if (error.errors) setErrors(error.errors);
       setMessage(error.message);
       setStatus('error');
       window.requestAnimationFrame(() => formRef.current?.querySelector('[aria-invalid="true"]')?.focus());
