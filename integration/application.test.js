@@ -27,7 +27,7 @@ function signLocalClaims(token, patch) {
 async function makeUser(label) {
   const email = `${label}-${randomUUID()}@district-wheels.test`;
   const password = randomBytes(24).toString('hex');
-  const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { role: 'owner', is_demo: false } });
+  const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { role: 'owner', is_demo: false, dcw_integration_fixture: true } });
   assert.ifError(error); createdUsers.push(data.user.id);
   const auth = createClient(config.API_URL, config.ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: signed, error: signError } = await auth.auth.signInWithPassword({ email, password });
@@ -37,7 +37,7 @@ async function makeUser(label) {
 before(async () => {
   await sql.connect();
   // Repair and remove only stale local test fixtures from an interrupted run.
-  const stale = await sql.query("select id from auth.users where email like 'owner-%@district-wheels.test' or email like 'unapproved-%@district-wheels.test'");
+  const stale = await sql.query("select id from auth.users where raw_user_meta_data->>'dcw_integration_fixture'='true' and email ~ '^(owner|unapproved)-[0-9a-f-]{36}@district-wheels[.]test$'");
   for (const user of stale.rows) {
     await sql.query('update auth.identities set created_at=coalesce(created_at,now()),updated_at=coalesce(updated_at,now()) where user_id=$1', [user.id]);
     const { error } = await admin.auth.admin.deleteUser(user.id); assert.ifError(error);
