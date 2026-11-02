@@ -1,5 +1,9 @@
 # Security and privacy
 
+**Current review:** see [SECURITY-CHECKLIST.md](../SECURITY-CHECKLIST.md) and the
+[application API/release guide](application-api.md). The Express API is now the
+buyer/backup backend; the older review notes below describe historical states.
+
 District Wheels Dispatch Directory stores buyer names, phone numbers, and delivery or pickup details. This document records the safeguards visible in the repository and the checks needed before using the app with real buyer information. The [owner and demo rollout guide](demo-owner-rollout.md) has the hosted setup and release procedure.
 
 ## Repository and configuration

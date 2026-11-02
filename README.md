@@ -1,177 +1,118 @@
 # District Wheels Dispatch Directory
 
-[![Made with AI assistance](https://img.shields.io/badge/Made_with-AI_assistance-blue)](AI-USAGE.md)
+District Wheels helps a fulfillment manager find repeat buyers and copy shipping details into LBC and J&T Express forms.
 
-I designed and directed the project, built the first working website, and wrote the earlier buyer sorting and phone-handling changes. Codex built much of the later feature code and helped polish and debug it; see [AI usage and authorship](AI-USAGE.md).
+**Application request path: React → authenticated Express API → Supabase PostgreSQL with RLS.** Express is the buyer and owner-backup API in development and on Vercel. Supabase Auth handles sign-in. Specialized Edge Functions handle demo sessions, demo reset, and the dispatch assistant; they use the same database and access rules.
 
-## 1. Overview
+[Completed security review and evidence](SECURITY-CHECKLIST.md) · [API contract](docs/application-api.md) · [AI usage and authorship](AI-USAGE.md)
 
-District Wheels Dispatch Directory helps a fulfillment manager find repeat buyers and copy saved shipping details into LBC or J&T Express forms. The Week 1 proposal and wireframes have since become a React application with buyer records, courier-specific locations, authentication, and a fictional-data demo.
+## Requirements
 
-The browser app uses Supabase Auth, Database, and Edge Functions. An Express API and JSON or PostgreSQL store remain in the repository for explicit local development and tests; the browser's buyer operations use Supabase directly.
+- Node.js 24.x and npm.
+- Docker Desktop (running) for the reproducible local Supabase environment. First setup downloads container images and may take several minutes.
+- No hosted Supabase account or AI API key is required for local buyer CRUD or the fictional demo.
 
-### Built with
-
-- React, React Router, and Vite for the browser interface.
-- Supabase Auth, PostgreSQL, and Edge Functions for the deployed app.
-- Express with an optional JSON or PostgreSQL store for local development and API tests.
-- Vercel for the browser deployment.
-
-## 2. Setup and installation
-
-### Prerequisites
-
-- Node.js and npm compatible with the versions in `package-lock.json`.
-- Access to a configured Supabase project for the browser app. The project must have the migrations, approved user profiles, Auth settings, and Edge Functions described in [demo and owner rollout](docs/demo-owner-rollout.md).
-- PostgreSQL only if using the optional Express API with `DATABASE_URL`. Without it, the server uses an ignored local JSON file.
-
-### Get the code and install dependencies
+## Fresh local setup
 
 ```bash
-git clone https://github.com/H1R0000/District-Wheels-Dispatch-Directory.git
-cd District-Wheels-Dispatch-Directory
 npm ci
+npm run local:setup
 ```
 
-### Configure the browser app
+The setup applies `supabase/migrations/` to local containers, creates an approved demo Auth account, and seeds three fictional buyers. It writes ignored server/browser/function configurations. Existing configurations are preserved once in `backups/local-config/`; existing local demo buyers are not reset on subsequent runs. This command rejects non-loopback Supabase targets.
 
-Copy `client/.env.example` to an untracked `client/.env.local` and fill in the Supabase project's public browser values (Vite's root is `client/`):
-
-```dotenv
-VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
-```
-
-These values are required: the sign-in screen fails closed when either is missing. Keep service-role keys, demo credentials, and other secrets out of `VITE_` variables and source control. The demo and assistant require their deployed Edge Functions and server-side secrets; `.env` alone does not create a working Supabase project.
-
-### Environment variables
-
-| Name | Used by | Purpose |
-| --- | --- | --- |
-| `VITE_SUPABASE_URL` | Browser build | Public URL of the Supabase project. |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Browser build | Public Supabase publishable key. |
-| `DATABASE_URL` | Optional Express server | PostgreSQL connection string; without it the server uses local JSON storage. |
-| `DATABASE_SSL` | Optional Express server | Set to `true` when its PostgreSQL connection requires SSL. |
-| `ENABLE_LEGACY_API` | Optional Express server | Set to `true` to enable its buyer endpoints for local development. |
-| `PORT` | Optional Express server | Listening port; defaults to `3000`. |
-
-Only the two `VITE_` values belong in the browser configuration. See [demo and owner rollout](docs/demo-owner-rollout.md) for the Edge Function secrets and hosted setup.
-
-### Run locally
+Start these commands in separate terminals:
 
 ```bash
-npm run dev:client
+npm run local:functions
 ```
 
-Open `http://localhost:5173`. Use **Sign in with GitHub** for the approved owner account or **Enter demo** for fictional records when the configured backend supports those flows.
-
-`npm run dev` starts both Vite and Express. Express listens on port `3000` by default, but its legacy buyer endpoints are disabled unless `ENABLE_LEGACY_API=true` is set explicitly. Set `DATABASE_URL` to use PostgreSQL; otherwise the optional API stores data in `data/dev-db.json`. Do not put real buyer data in this local development store.
-
-### Database setup
-
-The browser app depends on the SQL files in `supabase/migrations/`, applied in order to a project with the required Auth configuration. These migrations include buyer and location tables, row-level access policies, demo access, assistant lookups, backup and deletion functions, and atomic buyer save/delete RPCs. The existing hosted project has older migration-history timestamps for some files, so inspect its history before running `supabase db push`; do not blindly replay the files against that project. The repository does not contain a one-command seed for a fresh Supabase project; demo setup requires the administrator steps in [demo and owner rollout](docs/demo-owner-rollout.md).
-
-The optional Express/PostgreSQL path initializes `db/migrations/001_initial.sql` when `DATABASE_URL` is set. It is separate from the Supabase schema.
-
-## 3. Features and usage
-
-### Main workflow
-
-1. Search the Buyer Directory by name or phone number.
-2. Open a buyer record and review the preferred courier, saved delivery addresses, or LBC pickup locations.
-3. Copy the needed fields and paste them into the courier's external form.
-4. Use Add Buyer or Edit Buyer to maintain records. The form validates courier-specific location details.
-
-The four browser routes are `/`, `/buyers/new`, `/buyers/:buyerId`, and `/buyers/:buyerId/edit`. The interface includes a dispatch assistant that can prepare a buyer draft for review and help resolve LBC branch details. Review suggested details before saving them. Buyer saves and deletes run in single database transactions, including their audit records.
-
-The demo uses fictional records and is isolated from the owner's records. It can be reset where the deployed demo functions are available. Access is controlled by approved Supabase profiles and database policies, not just by the sign-in screen.
-
-### Demo screenshots
-
-![Desktop buyer directory and Dispatch Assistant in demo mode](docs/screenshots/directory-desktop-2026-10-04.png)
-
-![Phone buyer directory in demo mode](docs/screenshots/directory-mobile-2026-10-04.png)
-
-### Optional Express endpoints
-
-When `ENABLE_LEGACY_API=true`, the local API provides:
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/health` | Health check; available without enabling buyer endpoints. |
-| `GET` | `/api/buyers?q=...` | Search buyers. |
-| `GET` | `/api/buyers/:buyerId` | Read one buyer. |
-| `POST` | `/api/buyers` | Create a buyer. |
-| `PUT` | `/api/buyers/:buyerId` | Replace a buyer's details. |
-| `DELETE` | `/api/buyers/:buyerId` | Delete a buyer. |
-
-The legacy buyer API has no Supabase user context. Keep it disabled for public or production access.
-
-## 4. Project structure
-
-```text
-client/                  React pages, components, styles, and Vite config
-server/                  Optional Express API and JSON/PostgreSQL stores
-db/migrations/           Optional Express/PostgreSQL schema
-supabase/migrations/     Browser app database schema and access policies
-supabase/functions/      Demo, reset, and dispatch assistant functions
-test/                    API and utility tests
-docs/                    Proposal, wireframes, PDFs, and rollout notes
-images/                  District Wheels assets
+```bash
+npm run dev
 ```
 
-### Architecture
+Open **http://localhost:5173** and select **Enter Demo**. Vite proxies `/api` to Express at `127.0.0.1:3000`. Sign-in calls the local demo Edge Function; buyer operations then call Express with the current Supabase bearer token.
 
-The React app is served by Vercel and signs users in through Supabase Auth. It reads and changes buyer records through Supabase, where database policies control access. Supabase Edge Functions handle the demo and Dispatch Assistant workflows. The Express server is a separate local development and test path; the deployed browser app does not call it.
+The assistant can collect buyer details and use deterministic/cached lookups without an AI key. General AI conversation requires an optional `GROQ_API_KEY` in the ignored `supabase/functions/.env.local`; official carrier/postal lookups also need internet access. Missing external services must not prevent normal buyer CRUD.
 
-## 5. Tests and build
+The local demo has no owner privileges. Owner backup integration tests provision disposable local owner fixtures and remove them afterward. A real owner must sign in through GitHub and be provisioned by an administrator; the application never grants owner access from user-editable metadata or from an email/password login.
+
+To stop local services:
+
+```bash
+npx --no-install supabase stop
+```
+
+To deliberately recreate the local database, stop application processes, run `npx --no-install supabase db reset --local`, and rerun `npm run local:setup`. Reset deletes local data; it is not part of normal startup.
+
+## Environment configuration
+
+The bootstrap generates all required local values. For a hosted environment, use `.env.example` for Express and `client/.env.example` for Vite:
+
+- Server: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`; optional `PORT` (default 3000).
+- Browser: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- Edge Functions: `APP_ORIGINS`, `DEMO_EMAIL`, `DEMO_PASSWORD`, `DEMO_USER_ID`, `DEMO_RATE_SALT`; optional `GROQ_API_KEY`. Supabase supplies its platform keys to Edge Functions.
+
+Only public project configuration belongs in `VITE_` variables. Express uses the public key plus each caller's verified bearer token, not a service-role key. Local bootstrap and integration tests use local administrator credentials stored only in ignored files. Git and deployment uploads exclude environment files, private backups, temporary data, and unrelated presentation material.
+
+## API and database
+
+`GET /api/health` is public. All buyer and backup routes require a verified Supabase session and the database allowlist. The owner must have the approved GitHub identity and an OAuth session; demo access is limited to fictional demo rows.
+
+- `GET /api/buyers?q=...` — alphabetical name/phone search (`200`).
+- `GET /api/buyers/:buyerId` — record detail (`200`, or `404` for missing/inaccessible records).
+- `POST /api/buyers` — validated create (`201`, with a Location header).
+- `PUT /api/buyers/:buyerId` — validated replacement (`200`).
+- `DELETE /api/buyers/:buyerId` — atomic deletion (`204`).
+- `GET /api/owner/backup` — owner-only JSON export.
+- `POST /api/owner/backup/inspect` — owner-only dry run.
+- `POST /api/owner/backup/restore` — additive, atomic owner-only restore; existing records are never overwritten.
+
+Buyer JSON uses `name`, `phone`, `preferredCourier`, `addresses`, and `pickups`. The form and Express share normalization and field validation. PostgreSQL independently enforces constraints, ownership, and atomic saves/deletes with audit records. There is no JSON-store fallback or second PostgreSQL schema.
+
+Errors use `application/problem+json`, a safe `message`, field `errors` when applicable, and a correlation ID. Invalid input is `400`; unauthenticated access `401`; forbidden access `403`; missing records `404`; conflicts `409`; oversized input `413`; wrong content type `415`; throttling `429`; unavailability `503`; timeouts `504`; unexpected internal failures `500`.
+
+The canonical schema and changes live in `supabase/migrations/`. One historical migration now permits an empty fresh install to remain unprovisioned and closed. Existing production migrations must never be blindly replayed: older hosted timestamps differ from local history. Use the [release guide](docs/application-api.md#release-and-recovery) for forward-only deployment.
+
+## Verification
 
 ```bash
 npm test
+npm run test:integration
 npm run build
+npm audit
 ```
 
-On October 4, 2026, all 75 local tests and the production build passed. The full npm dependency audit reported zero vulnerabilities. The build script uses Vite's runner config loader to work in the restricted Windows workspace.
+With the local app and functions running, run `npx --no-install playwright install chromium`
+once, then `npm run test:browser`. On a machine with Chrome already installed,
+set `BROWSER_CHANNEL=chrome` instead of downloading Chromium.
 
-## 6. Deploy to Vercel
+Integration tests require `npm run local:setup` first and refuse hosted databases. They exercise real local Auth, RLS, REST requests, atomic rollback, backup restore, typed errors, and quota enforcement. OAuth claims in these tests are signed using only the local test JWT secret; this is not a production authentication shortcut or a live GitHub OAuth test.
 
-**Live deployment (September 26, 2026):** [District Wheels Dispatch Directory](https://district-wheels-dispatch-directory.vercel.app) from commit `ded43fa` (deployment `dpl_7AWffWiYn5JzCvPbc4BGH7RJn2ea`). The production site passed mobile demo sign-in, direct `/buyers/new` refresh, assistant draft preparation with an official LBC branch match, and demo buyer create, edit, and delete. The test record was removed. The production origin is configured in Supabase Auth and the three Edge Functions. Automatic GitHub deployments need the Vercel account's GitHub login connection; the CLI deployment is live and repeatable meanwhile.
+GitHub Actions runs unit/API checks and a production build, and separately provisions fresh Docker-backed Supabase for integration checks. See the security checklist for dated results and explicit unverified items.
 
-The root [`vercel.json`](vercel.json) builds the Vite app with `npm run build`, serves `client/dist`, and rewrites direct React route requests to `index.html`. The optional Express server is not part of the Vercel deployment.
+## Deployment
 
-1. Create a Vercel project from this GitHub repository with the repository root as its root directory.
-2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in the Vercel project for Preview and Production. They are browser values. Never add a service-role key, demo password, or assistant API secret to a `VITE_` variable.
-3. Deploy Preview. Add its exact origin to the Supabase Edge Function `APP_ORIGINS` secret if the demo or assistant will be tested there. Add the Preview callback URL to Supabase Auth redirect URLs when testing GitHub sign-in.
-4. After preview checks pass, deploy Production. Set the Supabase Auth Site URL and an exact allowed redirect URL for the production origin; add that origin to `APP_ORIGINS`. Redeploy affected Edge Functions after changing their secret when required by the platform.
-5. Test a fresh browser session, a direct refresh of `/buyers/new` and a buyer detail route, GitHub sign-in, the demo, and the dispatch workflow.
+The existing production site is [District Wheels](https://district-wheels-dispatch-directory.vercel.app). This revision is released first as a Vercel preview; production promotion is a separate step.
 
-See [demo and owner rollout](docs/demo-owner-rollout.md) for Supabase setup and release checks.
+Vercel serves the Vite build and `api/index.js` as an Express Node function. `/api/*` is routed before the React SPA fallback. Configure both server and browser Supabase variables in the appropriate Vercel environment, apply the additive API migration first, and allow the exact preview origin for Edge Functions before testing demo sign-in. Health, authenticated CRUD, owner isolation, direct page navigation, security headers, and assistant behavior must pass before promotion.
 
-On October 4, 2026, a live demo session loaded the three fictional buyers. The `/` search shortcut focused search, typing filtered the records, Escape cleared it, copying all shipping details showed success feedback, and the Dispatch Assistant answered a non-sensitive question. This smoke check did not test owner-only access or backup restore.
+The [release guide](docs/application-api.md#release-and-recovery) covers backup/fingerprint verification and rollback. Existing owner/demo records and backup formats must be preserved.
 
-## 7. Known limits
+## Code map
 
-- The assistant and demo require deployed Supabase Edge Functions and configured secrets. A local build alone cannot verify them.
-- Demo records are shared by visitors and may be reset. Do not enter real buyer information in demo mode.
-- The optional Express buyer API has no browser user context and stays disabled unless explicitly enabled for local development.
+- `client/`: interface, Supabase sign-in, authenticated Express client.
+- `server/`: Express routes, verified request context, Supabase repository, safe error mapping.
+- `shared/`: form/API validation and name normalization.
+- `supabase/`: the single schema/migration chain and specialized Edge Functions.
+- `test/`: isolated unit/API tests and test-only doubles.
+- `integration/`: real local database/Auth/RLS tests.
+- `scripts/`: guarded local bootstrap.
 
-## What I would do next
+The assistant separates request authentication, conversation orchestration, lookup access, tool execution, and model interaction. Existing buyer-draft evidence checks, privacy safeguards, and separate deletion confirmation remain in place.
 
-- Make fresh Supabase project setup and demo seeding repeatable with a documented command.
-- Add automated checks for the deployed sign-in, demo, and assistant workflows.
-- Decide whether to retire the separate Express path or connect it to the same access controls before any public use.
+## Features and authorship
 
-## AI use
+The product includes buyer search, courier-specific forms, copy fields, owner backups, fictional demo data, and assistant drafts that require human review before saving. Do not enter real buyer details into the shared demo.
 
-I used Codex to implement much of the later feature code and to polish and debug the app. I designed the workflow, built the first working website, wrote the early changes described in [AI-USAGE.md](AI-USAGE.md), and tested and directed the later work. The [AI usage record](AI-USAGE.md) lists examples, mistakes, corrections, and authorship evidence.
-
-## Supporting files
-
-- [Project documents index](docs/README.md)
-- [Project proposal](docs/proposal.md)
-- [Week 1 increment report](docs/REPORT_1.md)
-- [Week 2 increment report](docs/REPORT_2.md)
-- [Wireframe documentation](docs/wireframes.md)
-- [Wireframe PDF](docs/pdf/District-Wheels-Wireframes.pdf)
-- [Design-system PDF](docs/pdf/District-Wheels-Design-System.pdf)
-- [Demo and owner rollout](docs/demo-owner-rollout.md)
+I designed and directed the project and built the first working website. Codex implemented much of the later code and helped debug and verify it. [AI-USAGE.md](AI-USAGE.md) records authorship and corrections. Original course reports and wireframes remain in [docs/README.md](docs/README.md).
