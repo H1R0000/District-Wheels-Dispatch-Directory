@@ -4,8 +4,8 @@ import { buildBuyerSearchFilter } from '../shared/buyerSearch.js';
 import { ApiError } from './errors.js';
 
 export function mapBuyer(row) {
-  const addresses = (row.addresses ?? []).map((a) => ({ id: a.id, recipientName: a.recipient_name, recipientPhone: a.recipient_phone, street: a.street, barangay: a.barangay, city: a.city, province: a.province, zipCode: a.zip_code, isDefault: a.is_default }));
-  const pickups = (row.pickup_locations ?? []).map((p) => ({ id: p.id, recipientName: p.recipient_name, recipientPhone: p.recipient_phone, branchName: p.branch_name, branchAddress: p.branch_address, isDefault: p.is_default }));
+  const addresses = (row.addresses ?? []).map((a) => ({ id: a.id, recipientName: formatBuyerName(a.recipient_name), recipientPhone: a.recipient_phone, street: a.street, barangay: a.barangay, city: a.city, province: a.province, zipCode: a.zip_code, isDefault: a.is_default }));
+  const pickups = (row.pickup_locations ?? []).map((p) => ({ id: p.id, recipientName: formatBuyerName(p.recipient_name), recipientPhone: p.recipient_phone, branchName: p.branch_name, branchAddress: p.branch_address, isDefault: p.is_default }));
   return { id: row.id, name: formatBuyerName(row.name), phone: row.phone, preferredCourier: row.preferred_courier, addresses, pickups, addressCount: addresses.length, pickupCount: pickups.length };
 }
 

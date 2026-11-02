@@ -85,8 +85,8 @@ verified. Local synthetic OAuth tests are not a live GitHub sign-in test.
 ## Explicitly open release and privacy items
 
 - [x] **PASS — Hosted preview acceptance:** deployment
-  dpl_5wStSs6zSqPn8ehw5qQsMRuWx881 at
-  https://district-wheels-dispatch-directory-js8c7q5fe.vercel.app passed health,
+  dpl_6FZvuPyu4oerUTD2Qsbh8YyWQVBA at
+  https://district-wheels-dispatch-directory-apipreview.vercel.app passed health,
   real demo sign-in, buyer create/edit/delete through Express, direct navigation,
   assistant response, and zero browser runtime/CSP errors. Migration
   20261102172828 was applied transactionally after an explicitly approved private
@@ -125,7 +125,7 @@ npm audit
 npx --no-install supabase db advisors --local --type security
 ```
 
-Recorded results: 146 unit/API tests, six real database/Auth integration tests,
+Recorded results: 148 unit/API tests, six real database/Auth integration tests,
 local and protected-preview Chrome smoke checks, successful production build,
 and zero npm audit vulnerabilities. Local security advisors reported no issues;
 hosted advisors reported the two reviewed/open warnings above.

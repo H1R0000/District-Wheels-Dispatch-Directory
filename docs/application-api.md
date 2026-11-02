@@ -92,14 +92,14 @@ identical fingerprints immediately after migration. Owner-only fingerprints
 were also verified against that backup after the disposable demo smoke test.
 The demo test record was removed; its create/update/delete audit events remain.
 
-Preview: https://district-wheels-dispatch-directory-js8c7q5fe.vercel.app
-(dpl_5wStSs6zSqPn8ehw5qQsMRuWx881). Health, real demo sign-in, buyer CRUD through
+Preview: https://district-wheels-dispatch-directory-apipreview.vercel.app
+(dpl_6FZvuPyu4oerUTD2Qsbh8YyWQVBA). Health, real demo sign-in, buyer CRUD through
 Express, direct-route refresh, assistant reply, and browser CSP/runtime checks
 passed. Preview deployment protection remains enabled. Public Supabase settings
 were supplied to this preview deployment only; production Vercel settings and
 the production website/assistant code were not promoted or redeployed.
 
-The exact production and local origins plus the two previews created during this
+The exact production and local origins plus the active previews created during this
 review were explicitly approved for APP_ORIGINS. Previous unknown preview origins
 may have been removed because Supabase exposes only the original value's digest.
 The hosted database advisors report an existing intentional authenticated
