@@ -83,6 +83,34 @@ The additive migration can stay installed during rollback; do not delete quota
 infrastructure or buyer records as a recovery shortcut. Use the private backup
 only if verified data corruption requires recovery.
 
+## November 3, 2026 production receipt
+
+PR #2 was merged as main revision 4e177ec1f685d667d759c104041a05c7eee3f52c.
+Its unit/build and Docker/database/browser checks passed, as did the main-branch
+workflow. Production server and browser Supabase environment values are now
+configured. Vercel deployment dpl_DMmKYxUJXpoEeWpLN32bVwzyxLW5 is live at
+https://district-wheels-dispatch-directory.vercel.app, and the refactored
+dispatch-assistant is active as version 65. No additional schema migration or
+owner-data export was needed for this release.
+
+Production Chrome checks verified real demo sign-in, Express create/edit/delete
+using a disposable fictional demo record, direct-route navigation, assistant
+response, and zero runtime/CSP errors. Public API health returned JSON 200 and
+unauthenticated buyer access returned problem JSON 401. Owner buyer, address,
+pickup, and audit fingerprints matched their pre-release values afterward.
+The fictional demo fixture was removed; its audit trail remains.
+
+Rollback references remain available: previous Vercel deployment
+dpl_AhSmq2vvnymKJoS9UWgmQcchDQ1v and the assistant source in existing Git revision
+433e473. No hosted assistant source was downloaded. Keep the additive database
+migration installed if rolling back application code.
+
+Main is protected with required pull requests, strict passing unit-and-build and
+database-integration checks from GitHub Actions app 15368, resolved conversations,
+administrator enforcement, and blocked force pushes/deletion. Required approvals
+are zero so a solo maintainer can merge their own checked PRs. Subsequent changes,
+including these release notes, follow that same PR/check policy.
+
 ## November 3, 2026 preview receipt
 
 Migration 20261102172828 was applied transactionally to the existing hosted

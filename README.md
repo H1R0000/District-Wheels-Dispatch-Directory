@@ -93,7 +93,9 @@ GitHub Actions runs unit/API checks and a production build, and separately provi
 
 ## Deployment
 
-The existing production site is [District Wheels](https://district-wheels-dispatch-directory.vercel.app). This revision is released first as a Vercel preview; production promotion is a separate step.
+The production site is [District Wheels](https://district-wheels-dispatch-directory.vercel.app). The consolidated Express API and refactored assistant were released on November 3, 2026, from main revision `4e177ec`. Production browser verification passed and owner-data fingerprints were unchanged. The [release receipt](docs/application-api.md#november-3-2026-production-receipt) records deployment and rollback details.
+
+`main` requires pull requests and passing `unit-and-build` and `database-integration` checks from GitHub Actions. Branches must be up to date and conversations resolved; administrator enforcement is enabled and force pushes/deletion are blocked. There is no mandatory reviewer count so the sole maintainer can merge their own passing PRs. Vercel releases remain explicit CLI deployments; merging a PR does not itself perform a production release.
 
 Vercel serves the Vite build and `api/index.js` as an Express Node function. `/api/*` is routed before the React SPA fallback. Configure both server and browser Supabase variables in the appropriate Vercel environment, apply the additive API migration first, and allow the exact preview origin for Edge Functions before testing demo sign-in. Health, authenticated CRUD, owner isolation, direct page navigation, security headers, and assistant behavior must pass before promotion.
 
