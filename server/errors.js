@@ -17,6 +17,7 @@ export function safeError(error) {
     '42501': [403, 'This account cannot perform that operation.'],
     'PT404': [404, 'Buyer not found.'], 'PT400': [400, 'Check the submitted details.'],
     'PT403': [403, 'This account cannot perform that operation.'],
+    'PT504': [504, 'The service took too long. Try again.'],
     '57014': [504, 'The service took too long. Try again.'],
     'PGRST000': [503, 'The database is temporarily unavailable.'],
     'PGRST001': [503, 'The database is temporarily unavailable.'],
@@ -28,6 +29,7 @@ export function safeError(error) {
   if (codes[error.code]) return new ApiError(...codes[error.code]);
   if (['TimeoutError', 'AbortError'].includes(error.name)) return new ApiError(504, 'The service took too long. Try again.');
   if (error instanceof TypeError && error.message === 'fetch failed') return new ApiError(503, 'The service is temporarily unavailable.');
+  if (error.status === 504) return new ApiError(504, 'The service took too long. Try again.');
   if (error.status >= 500 || /^(08|53)/.test(error.code ?? '')) return new ApiError(503, 'The database is temporarily unavailable.');
   return new ApiError(500, 'The server could not complete the request.');
 }

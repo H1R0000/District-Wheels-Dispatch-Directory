@@ -125,7 +125,7 @@ npm audit
 npx --no-install supabase db advisors --local --type security
 ```
 
-Recorded results: 148 unit/API tests, six real database/Auth integration tests,
+Recorded results: 150 unit/API tests, six real database/Auth integration tests,
 local and protected-preview Chrome smoke checks, successful production build,
 and zero npm audit vulnerabilities. Local security advisors reported no issues;
 hosted advisors reported the two reviewed/open warnings above.
