@@ -81,6 +81,11 @@ verified. Local synthetic OAuth tests are not a live GitHub sign-in test.
 - [x] **PASS — CI authored:** GitHub Actions runs unit/API tests, audit, build,
   fresh Docker database integration, and browser smoke checks. Remote workflow
   results must be inspected on the PR; writing CI does not prove a hosted run passed.
+- [x] **PASS — Main branch protection:** GitHub reports main protected. Pull
+  requests, both trusted Actions checks, up-to-date branches, and resolved
+  conversations are required; administrator enforcement is on and force pushes
+  and deletion are blocked. Required reviewer count is zero for this solo-maintained
+  repository. PR #2 and its main-branch validation passed before production release.
 
 ## Explicitly open release and privacy items
 
@@ -109,9 +114,11 @@ verified. Local synthetic OAuth tests are not a live GitHub sign-in test.
 - [ ] **OPEN — Third-party assistant privacy:** messages may be sent to Groq and
   kept in tab session storage. Retention/consent requirements for real buyer data
   have not been established. Use fictional demo data and minimize submitted PII.
-- [ ] **OPEN — Production promotion:** separate release step after verified
-  preview; this change must not be described as promoted merely because its
-  additive database migration is installed.
+- [x] **PASS — Production release:** explicitly authorized and deployed on
+  November 3, 2026, from merged main revision 4e177ec. Production Vercel deployment
+  dpl_DMmKYxUJXpoEeWpLN32bVwzyxLW5 and assistant version 65 are active. Real demo
+  sign-in, Express CRUD, direct routes, assistant response, CSP/runtime checks,
+  unauthenticated API denial, and unchanged owner-data fingerprints were verified.
 
 ## Reproduction
 
