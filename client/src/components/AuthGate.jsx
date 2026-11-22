@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js';
 import { AuthContext } from '../lib/AuthContext.jsx';
 import logoUrl from '../../../images/dcw_logo.png';
+import { LoadingSpinner } from './LoadingState.jsx';
 
 function withinTimeout(promise, message) {
   return Promise.race([
@@ -138,9 +139,10 @@ export default function AuthGate({ children }) {
         <div className="auth-brand"><img src={logoUrl} alt="District Wheels" /></div>
         <h1 id="sign-in-heading">Sign in securely</h1>
         <p className="auth-intro">Continue with the approved H1R0000 GitHub account. No authentication email is required.</p>
-        <button className="button button-primary auth-provider-button" type="button" onClick={signInWithGitHub} disabled={Boolean(signingIn)}>{signingIn === 'github' ? 'Opening GitHub…' : 'Continue with GitHub'}</button>
+        <button className="button button-primary auth-provider-button" type="button" onClick={signInWithGitHub} disabled={Boolean(signingIn)} aria-busy={signingIn === 'github'}>{signingIn === 'github' && <LoadingSpinner />}{signingIn === 'github' ? 'Opening GitHub…' : 'Continue with GitHub'}</button>
         <div className="auth-divider"><span>or</span></div>
-        <button className="button button-secondary auth-provider-button" type="button" onClick={enterDemo} disabled={Boolean(signingIn)}>{signingIn === 'demo' ? 'Opening demo…' : 'Enter Demo'}</button>
+        <button className="button button-secondary auth-provider-button" type="button" onClick={enterDemo} disabled={Boolean(signingIn)} aria-busy={signingIn === 'demo'}>{signingIn === 'demo' && <LoadingSpinner />}{signingIn === 'demo' ? 'Opening demo…' : 'Enter Demo'}</button>
+        <span className="sr-only" role="status">{signingIn === 'github' ? 'Opening GitHub…' : signingIn === 'demo' ? 'Opening demo…' : ''}</span>
         <p className="auth-demo-note">Explore editable sample records. Changes are shared with other demo visitors and may be reset.</p>
         {message && <p className="auth-message" role="status">{message}</p>}
       </section>

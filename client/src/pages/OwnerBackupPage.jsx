@@ -4,6 +4,7 @@ import { Archive, ArrowLeft, Download, LockKeyhole, Upload } from 'lucide-react'
 import { useAppAuth } from '../lib/AuthContext.jsx';
 import { createOwnerBackup, downloadOwnerBackup, inspectOwnerBackup, restoreOwnerBackup } from '../lib/ownerBackup.js';
 import { canAccessOwnerBackup } from '../utils/navigation.js';
+import { LoadingSpinner } from '../components/LoadingState.jsx';
 
 export default function OwnerBackupPage() {
   const profile = useAppAuth();
@@ -15,6 +16,7 @@ export default function OwnerBackupPage() {
   if (!canAccessOwnerBackup(profile)) return <Navigate to="/" replace />;
 
   async function exportBackup() {
+    if (backupBusy) return;
     setBackupBusy('export');
     setBackupMessage('');
     setBackupError(false);
@@ -30,6 +32,7 @@ export default function OwnerBackupPage() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    if (backupBusy) return;
     setBackupBusy('import');
     setBackupMessage('');
     setBackupError(false);
@@ -43,6 +46,7 @@ export default function OwnerBackupPage() {
         setBackupMessage('Restore cancelled; nothing changed.');
         return;
       }
+      setBackupBusy('restore');
       const result = await restoreOwnerBackup(backup);
       setBackupMessage(`Restored ${result.restored_buyers} missing buyers. Existing records were left as they were.`);
     } catch (error) { setBackupError(true); setBackupMessage(error.message); }
@@ -60,14 +64,15 @@ export default function OwnerBackupPage() {
         </div>
       </div>
       <div className="owner-backup-actions">
-        <button className="button button-primary" type="button" onClick={exportBackup} disabled={Boolean(backupBusy)}><Download size={17} aria-hidden="true" />{backupBusy === 'export' ? 'Preparing backup…' : 'Download backup'}</button>
-        <button className="button button-secondary" type="button" onClick={() => backupInputRef.current?.click()} disabled={Boolean(backupBusy)}><Upload size={17} aria-hidden="true" />{backupBusy === 'import' ? 'Checking backup…' : 'Check a backup'}</button>
+        <button className="button button-primary" type="button" onClick={exportBackup} disabled={Boolean(backupBusy)}>{backupBusy === 'export' ? <LoadingSpinner /> : <Download size={17} aria-hidden="true" />}{backupBusy === 'export' ? 'Preparing backup…' : 'Download backup'}</button>
+        <button className="button button-secondary" type="button" onClick={() => backupInputRef.current?.click()} disabled={Boolean(backupBusy)}>{backupBusy === 'import' || backupBusy === 'restore' ? <LoadingSpinner /> : <Upload size={17} aria-hidden="true" />}{backupBusy === 'restore' ? 'Restoring buyers…' : backupBusy === 'import' ? 'Checking backup…' : 'Check a backup'}</button>
       </div>
-      <input ref={backupInputRef} className="sr-only" type="file" accept="application/json,.json" onChange={importBackup} aria-label="Choose owner backup file" />
+      <input ref={backupInputRef} className="sr-only" type="file" accept="application/json,.json" onChange={importBackup} aria-label="Choose owner backup file" disabled={Boolean(backupBusy)} />
       <div className="owner-backup-footer">
         <p className="owner-backup-privacy"><LockKeyhole size={15} aria-hidden="true" />Includes names, phone numbers, and addresses. Keep the file private.</p>
         {backupMessage && <p className={`owner-backup-status${backupError ? ' is-error' : ''}`} role="status">{backupMessage}</p>}
       </div>
     </section>
+    <span className="sr-only" role="status">{backupBusy === 'export' ? 'Preparing backup…' : backupBusy === 'import' ? 'Checking backup…' : backupBusy === 'restore' ? 'Restoring missing buyers…' : ''}</span>
   </div>;
 }
