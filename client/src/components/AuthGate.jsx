@@ -5,12 +5,13 @@ import logoUrl from '../../../images/dcw_logo.png';
 import { LoadingSpinner } from './LoadingState.jsx';
 
 function withinTimeout(promise, message) {
+  let timer;
   return Promise.race([
     promise,
     new Promise((_resolve, reject) => {
-      window.setTimeout(() => reject(new Error(message)), 8000);
+      timer = window.setTimeout(() => reject(new Error(message)), 8000);
     }),
-  ]);
+  ]).finally(() => window.clearTimeout(timer));
 }
 
 function hasOAuthMethod(accessToken) {
@@ -70,15 +71,14 @@ export default function AuthGate({ children }) {
     if (profile?.id !== session.user.id) setLoading(true);
     (async () => {
       try {
-        const { data: auth, error: authError } = await withinTimeout(
-          supabase.auth.getUser(), 'Account check timed out. Check your connection and reload.',
-        );
-        if (authError || !auth?.user) throw new Error('Your session could not be verified. Please sign in again.');
+        const [{ data: auth, error: authError }, { data: row, error: profileError }] = await Promise.all([
+          withinTimeout(supabase.auth.getUser(session.access_token),
+            'Account check timed out. Check your connection and reload.'),
+          withinTimeout(supabase.from('profiles').select('id,role,is_demo,github_provider_id').eq('id', session.user.id).maybeSingle(),
+            'Access check timed out. Check your connection and reload.'),
+        ]);
+        if (authError || !auth?.user || auth.user.id !== session.user.id) throw new Error('Your session could not be verified. Please sign in again.');
         const user = auth.user;
-        const { data: row, error: profileError } = await withinTimeout(
-          supabase.from('profiles').select('id,role,is_demo,github_provider_id').eq('id', user.id).maybeSingle(),
-          'Access check timed out. Check your connection and reload.',
-        );
         if (profileError) throw new Error('Access setup is incomplete. The Supabase profile migration may not be applied.');
         const valid = row?.id === user.id && (
           (row.role === 'owner' && row.is_demo === false && Boolean(row.github_provider_id) && hasOAuthMethod(session.access_token)) ||
