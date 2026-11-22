@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react';
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js';
 import { AuthContext } from '../lib/AuthContext.jsx';
 import logoUrl from '../../../images/dcw_logo.png';
+import { LoadingSpinner } from './LoadingState.jsx';
 
 function withinTimeout(promise, message) {
+  let timer;
   return Promise.race([
     promise,
     new Promise((_resolve, reject) => {
-      window.setTimeout(() => reject(new Error(message)), 8000);
+      timer = window.setTimeout(() => reject(new Error(message)), 8000);
     }),
-  ]);
+  ]).finally(() => window.clearTimeout(timer));
 }
 
 function hasOAuthMethod(accessToken) {
@@ -69,15 +71,14 @@ export default function AuthGate({ children }) {
     if (profile?.id !== session.user.id) setLoading(true);
     (async () => {
       try {
-        const { data: auth, error: authError } = await withinTimeout(
-          supabase.auth.getUser(), 'Account check timed out. Check your connection and reload.',
-        );
-        if (authError || !auth?.user) throw new Error('Your session could not be verified. Please sign in again.');
+        const [{ data: auth, error: authError }, { data: row, error: profileError }] = await Promise.all([
+          withinTimeout(supabase.auth.getUser(session.access_token),
+            'Account check timed out. Check your connection and reload.'),
+          withinTimeout(supabase.from('profiles').select('id,role,is_demo,github_provider_id').eq('id', session.user.id).maybeSingle(),
+            'Access check timed out. Check your connection and reload.'),
+        ]);
+        if (authError || !auth?.user || auth.user.id !== session.user.id) throw new Error('Your session could not be verified. Please sign in again.');
         const user = auth.user;
-        const { data: row, error: profileError } = await withinTimeout(
-          supabase.from('profiles').select('id,role,is_demo,github_provider_id').eq('id', user.id).maybeSingle(),
-          'Access check timed out. Check your connection and reload.',
-        );
         if (profileError) throw new Error('Access setup is incomplete. The Supabase profile migration may not be applied.');
         const valid = row?.id === user.id && (
           (row.role === 'owner' && row.is_demo === false && Boolean(row.github_provider_id) && hasOAuthMethod(session.access_token)) ||
@@ -138,9 +139,10 @@ export default function AuthGate({ children }) {
         <div className="auth-brand"><img src={logoUrl} alt="District Wheels" /></div>
         <h1 id="sign-in-heading">Sign in securely</h1>
         <p className="auth-intro">Continue with the approved H1R0000 GitHub account. No authentication email is required.</p>
-        <button className="button button-primary auth-provider-button" type="button" onClick={signInWithGitHub} disabled={Boolean(signingIn)}>{signingIn === 'github' ? 'Opening GitHub…' : 'Continue with GitHub'}</button>
+        <button className="button button-primary auth-provider-button" type="button" onClick={signInWithGitHub} disabled={Boolean(signingIn)} aria-busy={signingIn === 'github'}>{signingIn === 'github' && <LoadingSpinner />}{signingIn === 'github' ? 'Opening GitHub…' : 'Continue with GitHub'}</button>
         <div className="auth-divider"><span>or</span></div>
-        <button className="button button-secondary auth-provider-button" type="button" onClick={enterDemo} disabled={Boolean(signingIn)}>{signingIn === 'demo' ? 'Opening demo…' : 'Enter Demo'}</button>
+        <button className="button button-secondary auth-provider-button" type="button" onClick={enterDemo} disabled={Boolean(signingIn)} aria-busy={signingIn === 'demo'}>{signingIn === 'demo' && <LoadingSpinner />}{signingIn === 'demo' ? 'Opening demo…' : 'Enter Demo'}</button>
+        <span className="sr-only" role="status">{signingIn === 'github' ? 'Opening GitHub…' : signingIn === 'demo' ? 'Opening demo…' : ''}</span>
         <p className="auth-demo-note">Explore editable sample records. Changes are shared with other demo visitors and may be reset.</p>
         {message && <p className="auth-message" role="status">{message}</p>}
       </section>

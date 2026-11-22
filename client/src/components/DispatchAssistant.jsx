@@ -8,6 +8,7 @@ import { activeBuyerMessages, applyBuyerState, loadBuyerState, persistBuyerState
 import { insertPromptTemplate, resizeComposer, shouldSendOnEnter, suggestedPrompts } from '../utils/assistantComposer.js';
 import { buyerSessionMessages, conversationBuyer, summaryFields } from '../../../supabase/functions/dispatch-assistant/buyer-conversation.ts';
 import { availableReviewMessage, claimsReviewForm, isReviewRequest } from '../../../supabase/functions/dispatch-assistant/review-handoff.ts';
+import { LoadingSpinner } from './LoadingState.jsx';
 
 const welcomeMessage = { id: 'welcome', role: 'assistant', content: 'Paste a buyer’s details here, even if they are just a few lines. I’ll ask whether LBC delivery is Door to door or Branch pickup when needed, then prepare a form for you to review. You can also ask me to edit a buyer or look up an LBC branch or ZIP code.' };
 
@@ -290,7 +291,7 @@ function AssistantSession({ userId }) {
           {(message.draft || message.editDraft) && message === reviewMessage && <button type="button" disabled={busy} className="assistant-result-link" onClick={() => reviewDraft(message)}>Review and edit form</button>}
           {Array.isArray(message.branchChoices) && <div className="assistant-choices">{message.branchChoices.map((branch, index) => <div className="assistant-choice" key={`${branch.branch_name}-${branch.branch_address}`}><button type="button" disabled={busy || message !== messages.at(-1)} onClick={() => submitMessage(`Use option ${index + 1}`)}><strong>{index + 1}. {branch.branch_name}</strong><span>{branch.branch_address}</span></button>{safeSourceUrl(branch.source_url) && <a href={safeSourceUrl(branch.source_url)} target="_blank" rel="noopener noreferrer">View LBC source</a>}</div>)}</div>}
         </div>)}
-        {busy && <div className="assistant-message assistant" role="status">Thinking…</div>}
+        {busy && <div className="assistant-message assistant loading-label" role="status"><LoadingSpinner size={15} />Thinking…</div>}
         {buyerSummary && <section className="assistant-buyer-summary" aria-label="Current buyer summary">
           <h3>Current buyer <small>{buyerState?.buyerState.status === 'ready' || reviewMessage ? 'Ready for review' : 'Missing details'}</small></h3>
           <p>Not saved — your details stay here while we finish the draft.</p>
@@ -316,7 +317,7 @@ function AssistantSession({ userId }) {
             event.currentTarget.form?.requestSubmit();
           }
         }} placeholder="Type buyer details or ask a question…" aria-label="Message" />
-        <button type="submit" disabled={busy || !value.trim()} aria-label="Send message"><Send size={19} /></button>
+        <button type="submit" disabled={busy || !value.trim()} aria-label="Send message" aria-busy={busy}>{busy ? <LoadingSpinner size={19} /> : <Send size={19} />}</button>
         <span className="assistant-composer-hint assistant-desktop-hint">Enter to send · Shift+Enter for a new line</span>
         <span className="assistant-composer-hint assistant-mobile-hint">Tap Send · Enter for a new line</span>
       </form>

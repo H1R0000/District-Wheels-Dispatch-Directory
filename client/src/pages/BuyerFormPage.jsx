@@ -6,6 +6,7 @@ import { getBuyer, saveBuyer } from '../lib/buyers.js';
 import { applyAssistantEdit, editedDeliveryMethod } from '../utils/assistantEdit.js';
 import { formatBuyerName } from '../../../shared/buyerName.js';
 import { validateBuyer } from '../../../shared/buyerValidation.js';
+import LoadingState, { LoadingSpinner } from '../components/LoadingState.jsx';
 
 const emptyAddress = () => ({ street: '', barangay: '', city: '', province: '', zipCode: '', isDefault: false });
 const emptyPickup = () => ({ branchName: '', branchAddress: '', isDefault: false });
@@ -103,6 +104,7 @@ export default function BuyerFormPage() {
   const [status, setStatus] = useState(isEditing ? 'loading' : 'ready');
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
+  const [reloadKey, setReloadKey] = useState(0);
   const formRef = useRef(null);
 
   useEffect(() => {
@@ -117,7 +119,8 @@ export default function BuyerFormPage() {
   useEffect(() => {
     if (!isEditing) return undefined;
     const controller = new AbortController();
-    getBuyer(buyerId)
+    setStatus('loading');
+    getBuyer(buyerId, { signal: controller.signal })
       .then((data) => {
         if (!data) throw new Error('Buyer could not be loaded.');
         if (controller.signal.aborted) return;
@@ -126,12 +129,13 @@ export default function BuyerFormPage() {
         setDeliveryMethod(editedDeliveryMethod(data, editDraft));
         setStatus('ready');
       })
-      .catch((error) => { if (error.name !== 'AbortError') { setMessage(error.message); setStatus('error'); } });
+      .catch((error) => { if (!controller.signal.aborted) { setMessage(error.message); setStatus('load-error'); } });
     return () => controller.abort();
-  }, [buyerId, isEditing, location.key]);
+  }, [buyerId, isEditing, location.key, reloadKey]);
 
   async function submit(event) {
     event.preventDefault();
+    if (status === 'saving') return;
     setMessage('');
     const payload = buildBuyerPayload(buyer, deliveryMethod);
     const { errors: nextErrors } = validateBuyer(payload);
@@ -162,7 +166,8 @@ export default function BuyerFormPage() {
     if (preferredCourier === 'J&T Express') setDeliveryMethod('door');
   }
 
-  if (status === 'loading') return <div className="page"><p className="state-message">Loading buyer form…</p></div>;
+  if (status === 'loading') return <div className="page"><LoadingState label="Loading buyer form…" variant="form" /></div>;
+  if (status === 'load-error') return <div className="page"><h1>Buyer form unavailable</h1><p role="alert">{message}</p><div className="recovery-actions"><button className="button button-primary" type="button" onClick={() => { setMessage(''); setStatus('loading'); setReloadKey((value) => value + 1); }}>Try again</button><Link className="button button-secondary" to="/">Return to directory</Link></div></div>;
 
   return (
     <div className="page form-page">
@@ -176,23 +181,25 @@ export default function BuyerFormPage() {
         </div>
         {location.state?.draftGoogleSearchUrl && <small>Google search includes branch details only, not the buyer’s name or phone.</small>}
       </div>}
-      <form ref={formRef} onSubmit={submit} noValidate>
-        <section className="panel form-section">
-          <div className="section-heading"><div><h2>Buyer information</h2><p>Contact and courier preference.</p></div></div>
-          <div className="form-grid">
-            <label><span>Full name</span><input required name="name" autoComplete="name" maxLength="120" value={buyer.name} onChange={(event) => setBuyer({ ...buyer, name: event.target.value })} onBlur={() => setBuyer((current) => ({ ...current, name: formatBuyerName(current.name) }))} aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'name-error' : undefined} /><FieldError id="name-error">{errors.name}</FieldError></label>
-            <label><span>Phone number</span><input required name="phone" type="tel" inputMode="tel" autoComplete="tel" maxLength="32" placeholder="Example: 0917 123 4567" value={buyer.phone} onChange={(event) => setBuyer({ ...buyer, phone: event.target.value })} aria-invalid={Boolean(errors.phone)} aria-describedby={errors.phone ? 'phone-hint phone-error' : 'phone-hint'} /><small className="field-hint" id="phone-hint">Spaces and punctuation are removed when saved.</small><FieldError id="phone-error">{errors.phone}</FieldError></label>
-            <label><span>Preferred courier</span><select name="preferredCourier" value={buyer.preferredCourier} onChange={(event) => changeCourier(event.target.value)} aria-invalid={Boolean(errors.preferredCourier)} aria-describedby={errors.preferredCourier ? 'courier-error' : undefined}><option value="LBC">LBC</option><option value="J&T Express">J&amp;T Express</option></select><FieldError id="courier-error">{errors.preferredCourier}</FieldError></label>
-          </div>
-        </section>
-
-        {buyer.preferredCourier === 'LBC' && (
-          <fieldset className="panel form-section delivery-choice">
-            <legend>How will LBC deliver this buyer’s orders?</legend>
-            <div className="choice-grid">
-              <label className={deliveryMethod === 'door' ? 'selected' : ''}><input type="radio" name="deliveryMethod" value="door" checked={deliveryMethod === 'door'} onChange={() => { setDeliveryMethod('door'); if (buyer.addresses.length === 0) setBuyer({ ...buyer, addresses: [{ ...emptyAddress(), isDefault: true }] }); }} /><span><strong>Door to door</strong><small>Deliver to the buyer’s complete address.</small></span></label>
-              <label className={deliveryMethod === 'pickup' ? 'selected' : ''}><input type="radio" name="deliveryMethod" value="pickup" checked={deliveryMethod === 'pickup'} onChange={() => { setDeliveryMethod('pickup'); if (buyer.pickups.length === 0) setBuyer({ ...buyer, pickups: [{ ...emptyPickup(), isDefault: true }] }); }} /><span><strong>Branch pickup</strong><small>Send the parcel to a selected LBC branch.</small></span></label>
+      <form ref={formRef} onSubmit={submit} noValidate aria-busy={status === 'saving'}>
+        <fieldset className="form-controls" disabled={status === 'saving'}>
+          <legend className="sr-only">Buyer details</legend>
+          <section className="panel form-section">
+            <div className="section-heading"><div><h2>Buyer information</h2><p>Contact and courier preference.</p></div></div>
+            <div className="form-grid">
+              <label><span>Full name</span><input required name="name" autoComplete="name" maxLength="120" value={buyer.name} onChange={(event) => setBuyer({ ...buyer, name: event.target.value })} onBlur={() => setBuyer((current) => ({ ...current, name: formatBuyerName(current.name) }))} aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'name-error' : undefined} /><FieldError id="name-error">{errors.name}</FieldError></label>
+              <label><span>Phone number</span><input required name="phone" type="tel" inputMode="tel" autoComplete="tel" maxLength="32" placeholder="Example: 0917 123 4567" value={buyer.phone} onChange={(event) => setBuyer({ ...buyer, phone: event.target.value })} aria-invalid={Boolean(errors.phone)} aria-describedby={errors.phone ? 'phone-hint phone-error' : 'phone-hint'} /><small className="field-hint" id="phone-hint">Spaces and punctuation are removed when saved.</small><FieldError id="phone-error">{errors.phone}</FieldError></label>
+              <label><span>Preferred courier</span><select name="preferredCourier" value={buyer.preferredCourier} onChange={(event) => changeCourier(event.target.value)} aria-invalid={Boolean(errors.preferredCourier)} aria-describedby={errors.preferredCourier ? 'courier-error' : undefined}><option value="LBC">LBC</option><option value="J&T Express">J&amp;T Express</option></select><FieldError id="courier-error">{errors.preferredCourier}</FieldError></label>
             </div>
+          </section>
+
+          {buyer.preferredCourier === 'LBC' && (
+            <fieldset className="panel form-section delivery-choice">
+              <legend>How will LBC deliver this buyer’s orders?</legend>
+              <div className="choice-grid">
+                <label className={deliveryMethod === 'door' ? 'selected' : ''}><input type="radio" name="deliveryMethod" value="door" checked={deliveryMethod === 'door'} onChange={() => { setDeliveryMethod('door'); if (buyer.addresses.length === 0) setBuyer({ ...buyer, addresses: [{ ...emptyAddress(), isDefault: true }] }); }} /><span><strong>Door to door</strong><small>Deliver to the buyer’s complete address.</small></span></label>
+                <label className={deliveryMethod === 'pickup' ? 'selected' : ''}><input type="radio" name="deliveryMethod" value="pickup" checked={deliveryMethod === 'pickup'} onChange={() => { setDeliveryMethod('pickup'); if (buyer.pickups.length === 0) setBuyer({ ...buyer, pickups: [{ ...emptyPickup(), isDefault: true }] }); }} /><span><strong>Branch pickup</strong><small>Send the parcel to a selected LBC branch.</small></span></label>
+              </div>
           </fieldset>
         )}
 
@@ -204,10 +211,12 @@ export default function BuyerFormPage() {
 
         {message && <p className="form-error" role="alert">{message}</p>}
         <div className="form-actions">
-          <Link className="button button-secondary" to={isEditing ? `/buyers/${buyerId}` : '/'}>Cancel</Link>
-          <button className="button button-primary" type="submit" disabled={status === 'saving'}><Save size={17} aria-hidden="true" />{status === 'saving' ? 'Saving…' : isEditing ? 'Save changes' : 'Create buyer'}</button>
+          {status === 'saving' ? <span className="button button-secondary" aria-disabled="true">Cancel</span> : <Link className="button button-secondary" to={isEditing ? `/buyers/${buyerId}` : '/'}>Cancel</Link>}
+          <button className="button button-primary" type="submit" disabled={status === 'saving'}>{status === 'saving' ? <LoadingSpinner /> : <Save size={17} aria-hidden="true" />}{status === 'saving' ? 'Saving…' : isEditing ? 'Save changes' : 'Create buyer'}</button>
         </div>
+        </fieldset>
       </form>
+      <span className="sr-only" role="status">{status === 'saving' ? 'Saving buyer details…' : ''}</span>
     </div>
   );
 }

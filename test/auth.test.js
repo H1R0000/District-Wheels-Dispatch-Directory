@@ -26,6 +26,53 @@ test('missing, expired, unapproved sessions and unavailable services fail closed
   }
 });
 
+test('Supabase token verification and access lookup overlap, with quota claimed only after both pass', async () => {
+  const started = new Set();
+  const pending = new Map();
+  let quotaCalls = 0;
+  const authenticate = createAuthenticator({ url: 'https://test.supabase.co', key: 'public', fetcher: async (url) => {
+    const name = new URL(url).pathname.split('/').at(-1);
+    if (name === 'claim_api_request_slot') {
+      quotaCalls += 1;
+      assert.equal(pending.size, 0);
+      return Response.json({ authorized: true, allowed: true, remaining: 119, retry_after: 60 });
+    }
+    started.add(name);
+    return new Promise((resolve) => pending.set(name, () => {
+      pending.delete(name);
+      resolve(Response.json(name === 'user' ? { id: 'test-user' } : { allowed: true, role: 'demo' }));
+    }));
+  } });
+  const result = authenticate({ headers: { authorization: 'Bearer token' } });
+  // Allow the SDK's initialization and token retrieval microtasks to run.
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(started, new Set(['user', 'application_access']));
+  assert.equal(quotaCalls, 0);
+  pending.get('application_access')();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(quotaCalls, 0);
+  pending.get('user')();
+  assert.equal((await result).user.id, 'test-user');
+  assert.equal(quotaCalls, 1);
+});
+
+test('failed parallel access checks never claim quota or authorize a request', async () => {
+  for (const failure of ['user', 'application_access']) {
+    const calls = [];
+    const authenticate = createAuthenticator({ url: 'https://test.supabase.co', key: 'public', fetcher: async (url) => {
+      const name = new URL(url).pathname.split('/').at(-1);
+      calls.push(name);
+      if (name === 'user') return name === failure
+        ? Response.json({ message: 'Invalid token' }, { status: 401 })
+        : Response.json({ id: 'test-user' });
+      if (name === 'application_access') return Response.json({ allowed: failure !== name, role: 'demo' });
+      assert.fail('Quota must not be claimed for a failed access check.');
+    } });
+    await assert.rejects(authenticate({ headers: { authorization: 'Bearer token' } }), (error) => error.status === (failure === 'user' ? 401 : 403));
+    assert.deepEqual(calls.sort(), ['application_access', 'user']);
+  }
+});
+
 test('actual Supabase SDK preserves Auth timeouts through its retryable-error wrapper', async () => {
   const authenticate = createAuthenticator({ url: 'https://test.supabase.co', key: 'public', fetcher: async () => { throw new DOMException('internal timeout context', 'TimeoutError'); } });
   await assert.rejects(authenticate({ headers: { authorization: 'Bearer token' } }), (error) => error.status === 504 && !error.message.includes('internal'));

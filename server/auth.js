@@ -21,14 +21,16 @@ export function createAuthenticator({ url = process.env.SUPABASE_URL, key = proc
         }
       } },
     });
-    const { data, error } = await db.auth.getUser(token);
+    const [{ data, error }, { data: access, error: accessError }] = await Promise.all([
+      db.auth.getUser(token),
+      db.rpc('application_access'),
+    ]);
     if (error) {
       if (error.status === 504) throw new ApiError(504, 'Sign-in verification took too long. Try again.');
       if (error.status >= 500 || error.name === 'AuthRetryableFetchError') throw new ApiError(503, 'Sign-in verification is temporarily unavailable.');
       throw new ApiError(401, 'Your session has expired. Sign in again.');
     }
     if (!data.user) throw new ApiError(401, 'Sign in to continue.');
-    const { data: access, error: accessError } = await db.rpc('application_access');
     if (accessError) throw accessError;
     if (!access?.allowed) throw new ApiError(403, 'This session is not approved.');
     const { data: quota, error: quotaError } = await db.rpc('claim_api_request_slot');

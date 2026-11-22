@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ClipboardCopy, MapPin, Pencil, Trash2 } from 'lucide-react';
 import CopyField from '../components/CopyField.jsx';
+import LoadingState, { LoadingSpinner } from '../components/LoadingState.jsx';
 import { phoneForCourier } from '../utils/phone.js';
 import { deleteBuyer as removeBuyer, getBuyer } from '../lib/buyers.js';
 
@@ -28,9 +29,10 @@ export default function BuyerDetailsPage() {
 
   useEffect(() => {
     const controller = new AbortController();
+    setStatus('loading');
     async function loadBuyer() {
       try {
-        const result = await getBuyer(buyerId);
+        const result = await getBuyer(buyerId, { signal: controller.signal });
         if (controller.signal.aborted) return;
         if (!result) { setStatus('not-found'); return; }
         setBuyer(result);
@@ -38,7 +40,7 @@ export default function BuyerDetailsPage() {
         setSelectedAddressId((result.addresses.find((item) => item.isDefault) ?? result.addresses[0])?.id ?? '');
         setSelectedPickupId((result.pickups.find((item) => item.isDefault) ?? result.pickups[0])?.id ?? '');
         setStatus('ready');
-      } catch (error) { if (error.name !== 'AbortError') setStatus('error'); }
+      } catch { if (!controller.signal.aborted) setStatus('error'); }
     }
     loadBuyer();
     return () => controller.abort();
@@ -68,6 +70,7 @@ export default function BuyerDetailsPage() {
   }
 
   async function deleteBuyer() {
+    if (status === 'deleting') return;
     if (!window.confirm(`Delete ${buyer.name}? This cannot be undone.`)) return;
     setStatus('deleting');
     try {
@@ -76,7 +79,7 @@ export default function BuyerDetailsPage() {
     } catch { setStatus('error'); }
   }
 
-  if (status === 'loading') return <div className="page"><p className="state-message">Loading buyer…</p></div>;
+  if (status === 'loading') return <div className="page"><LoadingState label="Loading buyer…" /></div>;
   if (status === 'not-found') return <div className="page"><h1>Buyer not found</h1><Link to="/">Return to directory</Link></div>;
   if (status === 'error') return <div className="page"><h1>Buyer unavailable</h1><p>The buyer record could not be loaded. Check your connection and try again.</p><div className="recovery-actions"><button className="button button-primary" type="button" onClick={() => { setStatus('loading'); setReloadKey((value) => value + 1); }}>Try again</button><Link className="button button-secondary" to="/">Return to directory</Link></div></div>;
 
@@ -93,8 +96,9 @@ export default function BuyerDetailsPage() {
           <h1>{buyer.name}</h1>
           <p>Preferred courier: <strong>{buyer.preferredCourier}</strong></p>
         </div>
-        <div className="detail-actions"><Link className="button button-secondary" to={`/buyers/${buyer.id}/edit`}><Pencil size={17} aria-hidden="true" />Edit buyer</Link><button className="button button-danger" type="button" onClick={deleteBuyer} disabled={status === 'deleting'}><Trash2 size={17} aria-hidden="true" />{status === 'deleting' ? 'Deleting…' : 'Delete'}</button></div>
+        <div className="detail-actions">{status === 'deleting' ? <span className="button button-secondary" aria-disabled="true"><Pencil size={17} aria-hidden="true" />Edit buyer</span> : <Link className="button button-secondary" to={`/buyers/${buyer.id}/edit`}><Pencil size={17} aria-hidden="true" />Edit buyer</Link>}<button className="button button-danger" type="button" onClick={deleteBuyer} disabled={status === 'deleting'} aria-busy={status === 'deleting'}>{status === 'deleting' ? <LoadingSpinner /> : <Trash2 size={17} aria-hidden="true" />}{status === 'deleting' ? 'Deleting…' : 'Delete'}</button></div>
       </section>
+      {status === 'deleting' && <p className="loading-label" role="status"><LoadingSpinner />Deleting buyer…</p>}
 
       <div className="detail-grid">
         <section className="panel shipping-panel" aria-labelledby="shipping-heading">
